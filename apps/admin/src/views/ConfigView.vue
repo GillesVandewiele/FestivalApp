@@ -18,17 +18,22 @@ const draft = ref<Record<string, unknown>>({})
 const error = ref('')
 const newToken = ref<{ label: string; token: string } | null>(null)
 
-// A fixed set of swatches rather than a colour picker. A free picker produces
-// unreadable buttons on the dark POS screen; these are checked against it.
+// A fixed set rather than a colour picker: a free picker produces unreadable buttons
+// on the dark till screen.
+//
+// These are the dataviz reference palette's dark steps, validated with
+// scripts/validate_palette.js against the POS surface. The set they replace failed:
+// its terracotta and green sat at deltaE 1.7 for deuteranopia, so two categories a
+// volunteer had to tell apart could look identical to them.
 const SWATCHES = [
-  '#e8a33d',
-  '#c0566f',
-  '#4fb3a5',
-  '#5b9bd5',
-  '#a9764a',
-  '#8f7fd8',
-  '#5fae5f',
-  '#d97757',
+  '#3987e5',
+  '#d95926',
+  '#199e70',
+  '#c98500',
+  '#d55181',
+  '#008300',
+  '#9085e9',
+  '#e66767',
 ]
 
 const TABS = [
@@ -45,7 +50,8 @@ const editionId = computed(() => editions.currentId)
 function blankDraft() {
   const eid = editionId.value ?? ''
   if (tab.value === 'products')
-    return { edition_id: eid, slug: '', name: '', category: 'bier', price_coupons: 1,
+    return { edition_id: eid, slug: '', name: '',
+             category: (categories.value[0]?.slug as string) ?? '', price_coupons: 1,
              cost_price_eur: null, purchase_unit: null, available_at: [] }
   if (tab.value === 'categories')
     return { edition_id: eid, slug: '', name: '', colour: SWATCHES[0], sort_order: 0 }
@@ -244,7 +250,7 @@ watch([tab, editionId], load)
       <table v-if="tab === 'products'">
         <thead>
           <tr>
-            <th>Naam</th><th>Slug</th><th>Bonnetjes</th><th>Inkoop €</th>
+            <th>Naam</th><th>Slug</th><th>Categorie</th><th>Bonnetjes</th><th>Inkoop €</th>
             <th>Verpakking</th><th>Stuks erin</th>
             <th v-for="b in barsForEdition" :key="b.id">{{ b.name }}</th>
             <th></th>
@@ -254,6 +260,17 @@ watch([tab, editionId], load)
           <tr v-for="r in rows" :key="r.id">
             <td>{{ r.name }}</td>
             <td class="muted">{{ r.slug }}</td>
+            <td>
+              <select
+                :value="r.category"
+                @change="patch(r, 'category', ($event.target as HTMLSelectElement).value)"
+              >
+                <option v-for="c in categories" :key="c.id" :value="c.slug">{{ c.name }}</option>
+                <option v-if="!categories.some((c) => c.slug === r.category)" :value="r.category">
+                  {{ r.category }} (bestaat niet meer)
+                </option>
+              </select>
+            </td>
             <td><input class="mini" type="number" :value="r.price_coupons"
                        @change="patch(r, 'price_coupons', Number(($event.target as HTMLInputElement).value))" /></td>
             <td><input class="mini" type="number" step="0.01" :value="r.cost_price_eur ?? ''"

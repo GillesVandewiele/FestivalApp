@@ -47,10 +47,23 @@ async def by_hour(edition_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -
     return await stats.by_hour(db, edition_id, tz)
 
 
-@router.get("/stats/by-hour-by-product")
-async def by_hour_by_product(edition_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> dict:
+@router.get("/stats/by-hour-split")
+async def by_hour_split(
+    edition_id: str,
+    metric: str = Query(default="qty", pattern="^(qty|revenue_eur|margin_eur)$"),
+    group_by: str = Query(default="product", pattern="^(product|category)$"),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> dict:
     tz = await _timezone_of(db, edition_id)
-    return await stats.by_hour_by_product(db, edition_id, tz)
+    return await stats.by_hour_split(db, edition_id, tz, metric=metric, group_by=group_by)
+
+
+@router.get("/stats/stockout-impact")
+async def stockout_impact(
+    edition_id: str, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> list[dict]:
+    await _timezone_of(db, edition_id)
+    return await stats.stockout_impact(db, edition_id)
 
 
 @router.get("/stats/staff-consumption")

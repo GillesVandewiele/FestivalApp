@@ -39,11 +39,11 @@ DRINKS = [
 ]
 
 CATEGORIES = [
-    ("bier", "Bier", "#e8a33d"),
-    ("wijn", "Wijn", "#c0566f"),
-    ("cocktail", "Cocktail", "#4fb3a5"),
-    ("fris", "Frisdrank", "#5b9bd5"),
-    ("warm", "Warme dranken", "#a9764a"),
+    ("bier", "Bier", "#c98500"),
+    ("wijn", "Wijn", "#d55181"),
+    ("cocktail", "Cocktail", "#199e70"),
+    ("fris", "Frisdrank", "#3987e5"),
+    ("warm", "Warme dranken", "#d95926"),
 ]
 
 STAFF = ["Lotte", "Jonas", "Emma", "Wout", "Marie", "Sofie", "Bram", "Nore"]

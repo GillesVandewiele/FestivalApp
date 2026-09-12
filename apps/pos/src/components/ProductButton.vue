@@ -7,6 +7,7 @@ const props = defineProps<{
   colour: string
   qty: number
   soldOut: boolean
+  stockMode?: boolean
 }>()
 const emit = defineEmits<{ add: []; remove: [] }>()
 
@@ -48,9 +49,9 @@ function click() {
 <template>
   <button
     class="product"
-    :class="{ 'is-out': soldOut, 'has-qty': qty > 0 }"
+    :class="{ 'is-out': soldOut, 'has-qty': qty > 0 && !stockMode, 'is-stock': stockMode }"
     :style="{ '--tint': tint }"
-    :disabled="soldOut"
+    :disabled="soldOut && !stockMode"
     :aria-label="`${product.name}, ${priceLabel}${qty ? `, ${qty} in bestelling` : ''}`"
     @pointerdown="down"
     @pointerup="up"
@@ -110,6 +111,15 @@ function click() {
 }
 .product.is-out {
   opacity: 0.32;
+}
+/* In stock mode a sold-out drink must stay readable and tappable: that tap is how
+   it comes back. */
+.product.is-stock.is-out {
+  opacity: 0.55;
+  border-style: dashed;
+}
+.product.is-stock {
+  cursor: pointer;
 }
 .product:focus-visible {
   outline: 3px solid var(--text);

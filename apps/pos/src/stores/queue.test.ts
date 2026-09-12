@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { OrderPayload } from '../api/client'
+import { ApiError, type OrderPayload } from '../api/client'
 import { enqueue, pendingCount } from '../db/outbox'
 import { db } from '../db/schema'
 import { useQueue } from './queue'
@@ -86,5 +86,81 @@ describe('sync worker', () => {
 
     expect(queue.online).toBe(true)
     expect(await pendingCount()).toBe(0)
+  })
+})
+
+describe('sync worker, when the server rejects the code', () => {
+  it('stops retrying a code the server no longer recognises', async () => {
+    // Retrying cannot fix a revoked code, and at one attempt every five seconds it
+    // trips the server's guess limit, which blocks every tablet on the same wifi.
+    await enqueue(order('a'))
+    const queue = useQueue()
+    const syncOrders = vi.fn().mockRejectedValue(new ApiError(401, 'nope'))
+    queue.client = { syncOrders }
+
+    await queue.drain()
+    await queue.drain()
+    await queue.drain()
+
+    expect(syncOrders).toHaveBeenCalledTimes(1)
+    expect(queue.unlinked).toBe(true)
+  })
+
+  it('does not call an unlinked tablet offline', async () => {
+    await enqueue(order('a'))
+    const queue = useQueue()
+    queue.client = { syncOrders: vi.fn().mockRejectedValue(new ApiError(401, 'nope')) }
+
+    await queue.drain()
+
+    expect(queue.unlinked).toBe(true)
+    expect(queue.online).toBe(true) // the network is fine; the code is not
+  })
+
+  it('keeps queued orders when the tablet is unlinked', async () => {
+    await enqueue(order('a'))
+    const queue = useQueue()
+    queue.client = { syncOrders: vi.fn().mockRejectedValue(new ApiError(401, 'nope')) }
+
+    await queue.drain()
+
+    expect(await pendingCount()).toBe(1)
+  })
+
+  it('backs off instead of hammering when the address is throttled', async () => {
+    await enqueue(order('a'))
+    const queue = useQueue()
+    const syncOrders = vi.fn().mockRejectedValue(new ApiError(429, 'slow down'))
+    queue.client = { syncOrders }
+
+    await queue.drain()
+    await queue.drain()
+
+    expect(syncOrders).toHaveBeenCalledTimes(1)
+    expect(queue.unlinked).toBe(false)
+  })
+
+  it('resumes after re-linking, with the queue intact', async () => {
+    await enqueue(order('a'))
+    const queue = useQueue()
+    queue.client = { syncOrders: vi.fn().mockRejectedValue(new ApiError(401, 'nope')) }
+    await queue.drain()
+
+    queue.client = { syncOrders: vi.fn().mockResolvedValue({ accepted: ['a'], results: {} }) }
+    await queue.relinked()
+
+    expect(queue.unlinked).toBe(false)
+    expect(await pendingCount()).toBe(0)
+  })
+
+  it('still reports a genuine network failure as offline', async () => {
+    await enqueue(order('a'))
+    const queue = useQueue()
+    queue.client = { syncOrders: vi.fn().mockRejectedValue(new TypeError('fetch failed')) }
+
+    await queue.drain()
+
+    expect(queue.online).toBe(false)
+    expect(queue.unlinked).toBe(false)
   })
 })

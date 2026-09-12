@@ -24,8 +24,10 @@ const bars = ref<{ name: string; qty: number; coupons: number }[]>([])
 const staff = ref<{ name: string; orders: number; qty: number; voided: number }[]>([])
 const hours = ref<HourRow[]>([])
 const stack = ref<HourStack>({ hours: [], series: [] })
+const staffDrinks = ref<{ drinks: number; value_eur: number } | null>(null)
 const metric = ref<HourMetric>('qty')
-const splitByDrink = ref(false)
+// One split at a time: totaal, per drank, or the coarser per categorie.
+const split = ref<'none' | 'product' | 'category'>('none')
 
 const METRICS: [HourMetric, string][] = [
   ['qty', 'consumpties'],
@@ -33,9 +35,15 @@ const METRICS: [HourMetric, string][] = [
   ['margin_eur', 'marge'],
 ]
 
-/** Splitting by drink only makes sense for counts: a stacked euro figure per drink
- *  needs a cost price that is often missing, and would silently drop those drinks. */
-const canSplit = computed(() => metric.value === 'qty')
+const SPLITS: ['none' | 'product' | 'category', string][] = [
+  ['none', 'totaal'],
+  ['category', 'per categorie'],
+  ['product', 'per drank'],
+]
+
+/** Drinks left out of a margin stack because their cost price is not filled in. A
+ *  zero-height segment would read as "sold nothing", which is a different claim. */
+const excluded = computed(() => stack.value.excluded ?? [])
 const updatedAt = ref('')
 const failed = ref(false)
 
@@ -59,7 +67,12 @@ async function refresh() {
       auth.client.stats('by-staff', { edition_id: id }),
       auth.client.stats('by-hour', { edition_id: id }),
     ])
-    stack.value = await auth.client.stats('by-hour-by-product', { edition_id: id })
+    staffDrinks.value = await auth.client.stats('staff-consumption', { edition_id: id })
+    stack.value = await auth.client.stats('by-hour-split', {
+      edition_id: id,
+      metric: metric.value,
+      group_by: split.value === 'category' ? 'category' : 'product',
+    })
     overview.value = o
     products.value = p
     bars.value = b
@@ -81,6 +94,9 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => timer && clearInterval(timer))
 watch(() => editions.currentId, refresh)
+// The split is computed per metric and per grouping, so either change needs a
+// fresh one from the server.
+watch([metric, split], refresh)
 </script>
 
 <template>
@@ -108,6 +124,12 @@ watch(() => editions.currentId, refresh)
         :note="marginNote"
       />
       <StatTile
+        v-if="staffDrinks && staffDrinks.drinks > 0"
+        label="Personeel"
+        :value="formatNumber(staffDrinks.drinks)"
+        :note="`gratis, waarde ${formatEur(staffDrinks.value_eur)}`"
+      />
+      <StatTile
         label="Bestellingen"
         :value="formatNumber(overview?.orders)"
         :note="overview?.voided_orders ? `${overview.voided_orders} geannuleerd` : undefined"
@@ -126,18 +148,26 @@ watch(() => editions.currentId, refresh)
           >
             {{ label }}
           </button>
-          <label class="split">
-            <input v-model="splitByDrink" type="checkbox" :disabled="!canSplit" />
-            per drank
-          </label>
+          <span class="divider" aria-hidden="true"></span>
+          <button
+            v-for="[key, label] in SPLITS"
+            :key="key"
+            :class="{ on: split === key }"
+            @click="split = key"
+          >
+            {{ label }}
+          </button>
         </div>
       </div>
       <EChart
-        :option="splitByDrink && canSplit ? hourlyStackedOption(stack) : hourlyOption(hours, metric)"
+        :option="
+          split === 'none' ? hourlyOption(hours, metric) : hourlyStackedOption(stack, metric)
+        "
         :height="280"
       />
-      <p v-if="metric === 'margin_eur'" class="muted small">
-        Marge telt alleen dranken waarvan de inkoopprijs ingevuld is.
+      <p v-if="metric === 'margin_eur' && excluded.length" class="muted small">
+        Zonder {{ excluded.join(', ') }}: daarvan is de inkoopprijs nog niet ingevuld, dus de
+        marge is onbekend. Vul die aan bij Instellingen.
       </p>
     </section>
 
@@ -231,13 +261,11 @@ watch(() => editions.currentId, refresh)
   color: #fff;
   font-weight: 600;
 }
-.split {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 10px;
-  font-size: 14px;
-  color: var(--ink-dim);
+.divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 4px;
+  background: var(--line);
 }
 .small {
   font-size: 13px;

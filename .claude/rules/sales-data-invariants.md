@@ -63,6 +63,17 @@ A product that ran out did not sell what people wanted; it sold what was in stoc
 Forecasts that ignore this under-buy the same product every year, compounding. Anything
 that computes purchasing advice must account for recorded stockouts, not just units sold.
 
+## 8b. A stockout estimate refuses to guess
+
+`stockout_impact` projects a product's share of sales before it ran out onto everything
+sold while it was gone. It returns `estimated_lost: null` when there is too little to go
+on: fewer than 10 sold beforehand, or less than 30 minutes of trading. Its window is
+bounded by the edition's own dates, not by the first and last order, so one sale with a
+wrong timestamp cannot stretch it by weeks.
+
+**Why:** the estimate feeds a purchase order. A fabricated number there is worse than an
+honest gap, because nobody can tell it apart from a measured one.
+
 ## 9. Staff drinks are recorded but never counted as revenue
 
 `Order.kind` is `"sale"` or `"staff"`. **Every aggregation filters on it.** A staff drink

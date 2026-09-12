@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useFittedRows } from '../composables/useFittedRows'
 import type { Category, Product } from '../stores/session'
 import ProductButton from './ProductButton.vue'
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   categories: Category[]
   qtyOf: (id: string) => number
   soldOut: Set<string>
+  stockMode?: boolean
 }>()
 defineEmits<{ add: [Product]; remove: [Product] }>()
 
@@ -32,10 +34,49 @@ const groups = computed(() => {
   }
   return known.filter((g) => g.items.length > 0)
 })
+
+// Staff should never scroll to find a drink: the row that is off-screen is the row
+// nobody sells from. Button height is measured from the space available rather than
+// fixed, so the whole till fits however many categories there are.
+const MIN_COLUMN_PX = 150
+// Two drinks in a category must not become two 900px slabs.
+const MAX_COLUMN_PX = 240
+const rows = ref<HTMLElement>()
+const fit = computed(() => ({
+  groupSizes: groups.value.map((g) => g.items.length),
+  minColumnPx: MIN_COLUMN_PX,
+  gapPx: 10,
+  headingPx: 26,
+  sectionGapPx: 14,
+  minRowPx: 64,
+  maxRowPx: 132,
+}))
+const { rowHeight, columns, fits } = useFittedRows(rows, fit)
+
+/**
+ * The column count is set explicitly rather than left to `auto-fill`.
+ *
+ * `auto-fill` twice produced a count that did not match the measurement: with a
+ * definite max it sized repetitions from the max and overflowed a phone, and with
+ * `1fr` it packed four tracks into a box meant for three. The fit is already
+ * computed, so the grid is simply told the answer, and a max width keeps a button
+ * from becoming a slab when there is room to spare.
+ */
+const gridMaxWidth = computed(() => `${columns.value * (MAX_COLUMN_PX + 10) - 10}px`)
 </script>
 
 <template>
-  <div class="rows">
+  <div
+    ref="rows"
+    class="rows"
+    :class="{ scrolls: !fits }"
+    :style="{
+      '--row-h': `${rowHeight}px`,
+      '--col-min': `${MIN_COLUMN_PX}px`,
+      '--cols': columns,
+      '--grid-max': gridMaxWidth,
+    }"
+  >
     <section v-for="g in groups" :key="g.key" class="row">
       <h2 :style="{ '--tint': g.colour }">{{ g.name }}</h2>
       <div class="grid">
@@ -46,6 +87,7 @@ const groups = computed(() => {
           :colour="g.colour"
           :qty="qtyOf(p.id)"
           :sold-out="soldOut.has(p.id)"
+          :stock-mode="stockMode"
           @add="$emit('add', p)"
           @remove="$emit('remove', p)"
         />
@@ -57,11 +99,17 @@ const groups = computed(() => {
 <style scoped>
 .rows {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden; /* the fit is computed; nothing should need to scroll */
   padding: var(--gap);
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+/* Only when even the smallest usable button will not fit. A button too small to hit
+   is worse than a scrollbar. */
+.rows.scrolls {
+  overflow-y: auto;
 }
 h2 {
   display: flex;
@@ -83,8 +131,11 @@ h2::before {
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  grid-auto-rows: clamp(92px, 13vh, 124px);
+  /* min() so a very narrow screen still gets one full-width column instead of
+     overflowing sideways. */
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-auto-rows: var(--row-h);
   gap: var(--gap);
+  max-width: var(--grid-max);
 }
 </style>

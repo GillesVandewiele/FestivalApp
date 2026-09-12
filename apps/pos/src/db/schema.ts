@@ -22,4 +22,12 @@ db.version(1).stores({
   meta: 'key',
 })
 
+// A tablet that has already been used has version 1 on disk, so the added index has
+// to arrive as a new version or Dexie will never build it.
+db.version(2).stores({
+  outbox: 'id, synced, created_at',
+  stockouts: 'id, synced, product_id',
+  meta: 'key',
+})
+
 export { db }
