@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: festival-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"
+      - key: MONGO_DB
+        value: festival
+      - key: COOKIE_SECURE
+        value: "true"
+      # sync: false means Render prompts for the value and never stores it in git.
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: DEVICE_TOKEN_PEPPER
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

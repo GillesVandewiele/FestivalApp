@@ -11,7 +11,7 @@ One plan per subsystem. Each leaves the repository with working software.
 
 | # | Plan | Delivers |
 |---|---|---|
-| 1 | [Foundation and backend](superpowers/plans/2026-09-12-foundation-and-backend.md) | Data model, auth, device enrolment, sync API, CI, deploy |
+| 1 | [Foundation and backend](superpowers/plans/2026-09-12-foundation-and-backend.md) | Data model, auth, device enrolment, sync API, CI, deploy. **Code complete, awaiting hosting setup.** |
 | 2 | POS app (not yet written) | The tablet PWA, offline queue, sync |
 | 3 | Admin shell and live view (not yet written) | Login, catalog configuration, live dashboard |
 | 4 | Reports (not yet written) | Profit, quadrant, Pareto, procurement, year-over-year |
@@ -25,4 +25,4 @@ One plan per subsystem. Each leaves the repository with working software.
 
 ## Operations
 
-- `DEPLOYMENT.md` — written in plan 1, task 13.
+- [`DEPLOYMENT.md`](DEPLOYMENT.md) — Atlas and Render setup, environment variables, secret rotation.
