@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from .config import Settings, get_settings
 from .db import ensure_indexes, get_client
 from .middleware import add_security_headers, limiter
-from .routers import admin_catalog, admin_devices, admin_orders, auth, sync
+from .routers import admin_catalog, admin_devices, admin_orders, auth, stats, sync
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -43,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin_orders.router)
     app.include_router(admin_catalog.router)
     app.include_router(sync.router)
+    app.include_router(stats.router)
 
     @app.get("/api/v1/health")
     async def health() -> dict:
