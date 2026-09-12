@@ -328,17 +328,62 @@ async def compare(db: AsyncIOMotorDatabase, edition_a: str, edition_b: str) -> l
     return out
 
 
-async def by_hour_by_product(
-    db: AsyncIOMotorDatabase, edition_id: str, tz: str, top: int = 7
+async def by_hour_split(
+    db: AsyncIOMotorDatabase,
+    edition_id: str,
+    tz: str,
+    metric: str = "qty",
+    group_by: str = "product",
+    top: int = 7,
 ) -> dict:
-    """Per-hour quantities split by drink, for the stacked chart.
+    """Per-hour figures split by drink or by category, for the stacked chart.
+
+    `metric` is "qty", "revenue_eur" or "margin_eur".
+    `group_by` is "product" for one series per drink, or "category" for the coarser
+    view. Categories are few, so that one rarely needs an "Overig" bucket.
+
+    Quantity and revenue are always computable: the coupon price is snapshotted onto
+    every order line. Margin is not, because a drink whose cost price has not been
+    entered has no margin to stack. Those drinks are left out and named in `excluded`,
+    rather than being drawn as a zero-height segment that reads as "sold nothing".
 
     The validated palette has eight categorical slots on the adjacent pairlist that
-    stacked bars use, so the busiest `top` drinks are named and the rest fold into
-    one "Overig" series. A ninth generated hue is never an option.
+    stacked bars use, so the busiest `top` drinks are named and the rest fold into one
+    "Overig" series. A ninth generated hue is never an option.
     """
+    value = await _coupon_value(db, edition_id)
+    catalogue = {p["slug"]: p async for p in db.products.find({"edition_id": edition_id})}
+
     ranked = await by_product(db, edition_id)
-    named = {r["slug"]: r["name"] for r in ranked[:top]}
+    excluded: list[str] = []
+    if metric == "margin_eur":
+        excluded = [r["name"] for r in ranked if not r["cost_known"]]
+        ranked = [r for r in ranked if r["cost_known"]]
+    eligible = {r["slug"] for r in ranked}
+
+    if group_by == "category":
+        categories = {
+            c["slug"]: c["name"] async for c in db.categories.find({"edition_id": edition_id})
+        }
+
+        def label_of(slug: str) -> str:
+            # A configured category shows its name. One that has been deleted shows
+            # its raw slug, which tells the organiser which category went missing;
+            # "Overige" would hide that. A product with no category at all has
+            # nothing to show but the bucket.
+            cat = catalogue.get(slug, {}).get("category", "")
+            return categories.get(cat, cat or "Overige")
+
+        totals: dict[str, float] = {}
+        for r in ranked:
+            totals[label_of(r["slug"])] = totals.get(label_of(r["slug"]), 0) + (r.get(metric) or 0)
+        ordered_labels = sorted(totals, key=lambda k: -totals[k])[:top]
+        named = {
+            r["slug"]: label_of(r["slug"]) for r in ranked if label_of(r["slug"]) in ordered_labels
+        }
+    else:
+        ranked = sorted(ranked, key=lambda r: -(r.get(metric) or 0))
+        named = {r["slug"]: r["name"] for r in ranked[:top]}
 
     pipeline = [
         _match(edition_id),
@@ -350,26 +395,48 @@ async def by_hour_by_product(
                     "slug": "$items.slug",
                 },
                 "qty": {"$sum": "$items.qty"},
+                "coupons": {"$sum": {"$multiply": ["$items.qty", "$items.unit_price_coupons"]}},
             }
         },
     ]
     rows = await db.orders.aggregate(pipeline).to_list(None)
 
+    def amount(row: dict) -> float:
+        if metric == "qty":
+            return row["qty"]
+        revenue = row["coupons"] * value
+        if metric == "revenue_eur":
+            return revenue
+        cost_price = catalogue.get(row["_id"]["slug"], {}).get("cost_price_eur") or 0
+        return revenue - row["qty"] * cost_price
+
     hours = sorted({r["_id"]["hour"] for r in rows})
-    series: dict[str, dict[int, int]] = {name: dict.fromkeys(hours, 0) for name in named.values()}
-    if len(ranked) > top:
-        series["Overig"] = dict.fromkeys(hours, 0)
+    labels = list(dict.fromkeys(named.values()))  # de-duplicated, order preserved
+    has_other = (
+        len({*named.values()}) < len({*(named.values())})
+        or len({s for s in eligible if s not in named}) > 0
+    )
+    if has_other:
+        labels.append("Overig")
+    series: dict[str, dict[int, float]] = {label: dict.fromkeys(hours, 0.0) for label in labels}
 
     for r in rows:
-        label = named.get(r["_id"]["slug"], "Overig")
+        slug = r["_id"]["slug"]
+        if slug not in eligible:
+            continue  # unpriced drink in margin mode
+        label = named.get(slug, "Overig")
         if label in series:
-            series[label][r["_id"]["hour"]] += r["qty"]
+            series[label][r["_id"]["hour"]] += amount(r)
 
     ordered = [h["hour_local"] for h in _chronological([{"hour_local": h} for h in hours])]
     return {
         "hours": ordered,
+        "metric": metric,
+        "group_by": group_by,
+        "excluded": excluded,
         "series": [
-            {"name": name, "data": [by_h[h] for h in ordered]} for name, by_h in series.items()
+            {"name": name, "data": [_round2(by_h[h]) for h in ordered]}
+            for name, by_h in series.items()
         ],
     }
 
@@ -410,7 +477,22 @@ async def staff_consumption(db: AsyncIOMotorDatabase, edition_id: str) -> dict:
         ]
     ).to_list(None)
 
+    per_bar = await db.orders.aggregate(
+        [
+            match,
+            {
+                "$group": {
+                    "_id": "$bar_id",
+                    "drinks": {"$sum": {"$sum": "$items.qty"}},
+                    "coupons": {"$sum": "$total_coupons"},
+                }
+            },
+            {"$sort": {"drinks": -1}},
+        ]
+    ).to_list(None)
+
     names = {s["_id"]: s["name"] async for s in db.staff.find({"edition_id": edition_id})}
+    bars = {b["_id"]: b["name"] async for b in db.bars.find({"edition_id": edition_id})}
     total_coupons = sum(r["coupons"] for r in per_product)
 
     return {
@@ -432,4 +514,117 @@ async def staff_consumption(db: AsyncIOMotorDatabase, edition_id: str) -> dict:
             }
             for r in per_staff
         ],
+        "per_bar": [
+            {
+                "bar_id": r["_id"],
+                "name": bars.get(r["_id"], "?"),
+                "drinks": r["drinks"],
+                "value_eur": _round2(r["coupons"] * value),
+            }
+            for r in per_bar
+        ],
     }
+
+
+async def stockout_impact(db: AsyncIOMotorDatabase, edition_id: str) -> list[dict]:
+    """Estimate what a drink would have sold if it had not run out.
+
+    The method is deliberately simple enough to explain in one line, because a
+    purchasing decision rests on it:
+
+        share of all drinks before it ran out  x  all drinks sold while it was gone
+
+    If Jupiler was 30% of everything sold up to 23:00, and the bar sold 400 drinks
+    between 23:00 and closing, roughly 120 of those would have been Jupiler.
+
+    It refuses to guess when there is too little to go on. A drink that ran out in
+    the first half hour has no reliable share to project, and a made-up number in a
+    purchasing plan is worse than an honest gap.
+    """
+    windows = await db.stockouts.find({"edition_id": edition_id}).to_list(None)
+    if not windows:
+        return []
+
+    # Bounded by the edition's own dates rather than by its first and last order. A
+    # single stray sale, from a test or a tablet with a wrong clock, would otherwise
+    # stretch the window by weeks and turn every estimate into nonsense.
+    edition = await db.editions.find_one({"_id": edition_id})
+    if edition is None:
+        return []
+    festival_start = edition["starts_at"]
+
+    last = (
+        await db.orders.find(
+            {"edition_id": edition_id, **SOLD, "created_at": {"$lte": edition["ends_at"]}}
+        )
+        .sort("created_at", -1)
+        .limit(1)
+        .to_list(1)
+    )
+    if not last:
+        return []
+    festival_end = last[0]["created_at"]
+
+    names = {p["slug"]: p["name"] async for p in db.products.find({"edition_id": edition_id})}
+
+    async def drinks_between(start, end, slug: str | None, include_end: bool = False) -> int:
+        # An open-ended outage runs to the last sale of the night, and that sale is
+        # inside the window. A closed one ends when the drink came back, and a sale
+        # at that instant is after it returned.
+        upper = {"$lte": end} if include_end else {"$lt": end}
+        match: dict = {"edition_id": edition_id, **SOLD, "created_at": {"$gte": start, **upper}}
+        pipeline: list[dict] = [{"$match": match}, {"$unwind": "$items"}]
+        if slug:
+            pipeline.append({"$match": {"items.slug": slug}})
+        pipeline.append({"$group": {"_id": None, "qty": {"$sum": "$items.qty"}}})
+        rows = await db.orders.aggregate(pipeline).to_list(1)
+        return rows[0]["qty"] if rows else 0
+
+    MIN_DRINKS_BEFORE = 10
+    MIN_MINUTES_BEFORE = 30
+
+    out = []
+    for w in windows:
+        slug = w["slug"]
+        out_at = w["out_at"]
+        closed = w.get("back_at") is not None
+        back_at = w.get("back_at") or festival_end
+        # A window outside the festival's own dates is not a stockout worth
+        # reporting: it is a tablet with a wrong clock, or a test.
+        out_at = max(out_at, festival_start)
+        back_at = min(back_at, festival_end)
+        if back_at <= out_at:
+            continue
+
+        minutes_before = (out_at - festival_start).total_seconds() / 60
+        sold_before = await drinks_between(festival_start, out_at, slug)
+        all_before = await drinks_between(festival_start, out_at, None)
+        all_during = await drinks_between(out_at, back_at, None, include_end=not closed)
+
+        reliable = (
+            sold_before >= MIN_DRINKS_BEFORE
+            and minutes_before >= MIN_MINUTES_BEFORE
+            and all_before > 0
+        )
+        share = sold_before / all_before if all_before else 0.0
+        estimated_lost = round(share * all_during) if reliable else None
+
+        # A window nobody sold through had no impact, and listing it is noise.
+        if all_during == 0:
+            continue
+
+        out.append(
+            {
+                "slug": slug,
+                "name": names.get(slug, slug),
+                "out_at": out_at.isoformat(),
+                "back_at": w.get("back_at").isoformat() if w.get("back_at") else None,
+                "hours_out": round((back_at - out_at).total_seconds() / 3600, 1),
+                "sold_before": sold_before,
+                "share_before_pct": _round2(share * 100),
+                "drinks_during_outage": all_during,
+                "estimated_lost": estimated_lost,
+                "reliable": reliable,
+            }
+        )
+    return out

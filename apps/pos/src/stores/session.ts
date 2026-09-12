@@ -65,6 +65,22 @@ export const useSession = defineStore('session', () => {
     await db.meta.put({ key: 'clockOffsetMs', value: clockOffsetMs.value })
   }
 
+  /**
+   * Forget this tablet's code and go back to the enrol screen.
+   *
+   * Queued orders are deliberately left alone. They carry their own ids and their
+   * own edition and bar, so once a valid code is entered again they sync to exactly
+   * where they belonged, with no duplicates.
+   */
+  async function unlink(): Promise<void> {
+    token.value = null
+    staffId.value = null
+    catalog.value = null
+    await db.meta.delete('token')
+    await db.meta.delete('staffId')
+    await db.meta.delete('catalog')
+  }
+
   async function chooseStaff(id: string | null): Promise<void> {
     staffId.value = id
     await db.meta.put({ key: 'staffId', value: id })
@@ -81,5 +97,6 @@ export const useSession = defineStore('session', () => {
     enrol,
     refresh,
     chooseStaff,
+    unlink,
   }
 })

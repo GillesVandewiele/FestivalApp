@@ -58,3 +58,28 @@ async def test_procurement_csv_export(auth_client, festival):
 async def test_unknown_report_is_404(auth_client, festival):
     r = await auth_client.get(f"/api/v1/export/nonsense.csv?edition_id={festival['e26'].id}")
     assert r.status_code == 404
+
+
+async def test_hourly_split_endpoint_defaults_to_drinks(auth_client, festival):
+    r = await auth_client.get(f"/api/v1/stats/by-hour-split?edition_id={festival['e26'].id}")
+    assert r.status_code == 200
+    assert r.json()["group_by"] == "product"
+    assert r.json()["metric"] == "qty"
+
+
+async def test_hourly_split_endpoint_accepts_category_and_metric(auth_client, festival):
+    r = await auth_client.get(
+        f"/api/v1/stats/by-hour-split?edition_id={festival['e26'].id}"
+        "&group_by=category&metric=revenue_eur"
+    )
+    assert r.status_code == 200
+    assert r.json()["group_by"] == "category"
+    assert r.json()["metric"] == "revenue_eur"
+
+
+async def test_hourly_split_rejects_a_metric_it_does_not_have(auth_client, festival):
+    """A typo must fail loudly rather than silently falling back to counts."""
+    r = await auth_client.get(
+        f"/api/v1/stats/by-hour-split?edition_id={festival['e26'].id}&metric=nonsense"
+    )
+    assert r.status_code == 422

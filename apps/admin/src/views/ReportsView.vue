@@ -29,6 +29,19 @@ interface AdviceRow {
   cost_eur: number | null
   cost_known: boolean
   had_stockout: boolean
+  estimated_lost: number | null
+  demand_base: number
+  basis: 'sold' | 'measured' | 'buffer'
+}
+
+interface StockoutRow {
+  slug: string
+  name: string
+  hours_out: number
+  share_before_pct: number
+  drinks_during_outage: number
+  estimated_lost: number | null
+  reliable: boolean
 }
 
 const auth = useAuth()
@@ -39,12 +52,14 @@ const hours = ref<HourRow[]>([])
 const peaks = ref<{ name: string; peak_hour: number; peak_qty: number }[]>([])
 const comparison = ref<CompareRow[]>([])
 const advice = ref<AdviceRow[]>([])
+const stockouts = ref<StockoutRow[]>([])
 const staffUse = ref<{
   drinks: number
   coupons: number
   value_eur: number
   per_product: { slug: string; name: string; qty: number; coupons: number }[]
   per_staff: { staff_id: string; name: string; drinks: number; value_eur: number }[]
+  per_bar: { bar_id: string; name: string; drinks: number; value_eur: number }[]
 } | null>(null)
 
 const compareTo = ref<string | null>(null)
@@ -75,6 +90,7 @@ async function load() {
   hours.value = h
   peaks.value = k
   staffUse.value = await auth.client.stats('staff-consumption', { edition_id: id })
+  stockouts.value = await auth.client.stats('stockout-impact', { edition_id: id })
   await Promise.all([loadCompare(), loadAdvice()])
 }
 
@@ -234,18 +250,53 @@ watch(compareTo, async () => {
       </p>
     </section>
 
-    <section v-if="staffUse && staffUse.drinks > 0" class="card">
+    <section v-if="stockouts.length" class="card">
+      <h2>Wat we misliepen toen iets op was</h2>
+      <p class="muted small">
+        Een drank die opraakt verkocht wat er stond, niet wat mensen wilden. De schatting
+        is het aandeel dat die drank had vóór ze op was, toegepast op alles wat er nadien
+        nog over de toog ging.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Drank</th><th>Uren op</th><th>Aandeel ervoor</th>
+            <th>Verkocht in die uren</th><th>Gemist</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in stockouts" :key="r.slug">
+            <td>{{ r.name }}</td>
+            <td>{{ r.hours_out }}</td>
+            <td>{{ formatPct(r.share_before_pct) }}</td>
+            <td>{{ formatNumber(r.drinks_during_outage) }}</td>
+            <td>
+              <strong v-if="r.reliable">{{ formatNumber(r.estimated_lost) }}</strong>
+              <span v-else class="muted" title="Te vroeg opgeraakt om betrouwbaar te schatten">
+                te weinig gegevens
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="personeel" class="card">
       <h2>Wat het personeel dronk</h2>
       <p class="muted small">
         Deze consumpties zijn gratis en tellen nergens mee als omzet. Ze staan hier apart, zodat
         je weet wat ze gekost hebben.
       </p>
-      <div class="staff-totals">
+      <p v-if="!staffUse || staffUse.drinks === 0" class="muted">
+        Nog niets geregistreerd. Medewerkers zetten de knop <strong>personeel</strong> aan in de
+        bar-app voordat ze afrekenen; die consumpties zijn gratis en komen hier terecht.
+      </p>
+      <div v-if="staffUse && staffUse.drinks > 0" class="staff-totals">
         <span><strong>{{ formatNumber(staffUse.drinks) }}</strong> consumpties</span>
         <span><strong>{{ formatNumber(staffUse.coupons) }}</strong> bonnetjes</span>
         <span>waarde <strong>{{ formatEur(staffUse.value_eur) }}</strong></span>
       </div>
-      <div class="cols">
+      <div v-if="staffUse && staffUse.drinks > 0" class="cols">
         <table>
           <thead><tr><th>Drank</th><th>Aantal</th></tr></thead>
           <tbody>
@@ -258,6 +309,16 @@ watch(compareTo, async () => {
           <thead><tr><th>Medewerker</th><th>Aantal</th><th>Waarde</th></tr></thead>
           <tbody>
             <tr v-for="r in staffUse.per_staff" :key="r.staff_id">
+              <td>{{ r.name }}</td>
+              <td>{{ formatNumber(r.drinks) }}</td>
+              <td>{{ formatEur(r.value_eur) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <table>
+          <thead><tr><th>Verkooppunt</th><th>Aantal</th><th>Waarde</th></tr></thead>
+          <tbody>
+            <tr v-for="r in staffUse.per_bar" :key="r.bar_id">
               <td>{{ r.name }}</td>
               <td>{{ formatNumber(r.drinks) }}</td>
               <td>{{ formatEur(r.value_eur) }}</td>
@@ -291,11 +352,24 @@ watch(compareTo, async () => {
           <tr v-for="r in advice" :key="r.slug">
             <td>
               {{ r.name }}
-              <span v-if="r.had_stockout" class="flag" title="Dit product was uitverkocht, dus de verkoop onderschat de vraag">
+              <span
+                v-if="r.had_stockout"
+                class="flag"
+                :title="
+                  r.basis === 'measured'
+                    ? 'Was op. De vraag is geschat uit het aandeel vóór het opraakte.'
+                    : 'Was op, maar te vroeg om te schatten. Vandaar een ruimere marge.'
+                "
+              >
                 was op
               </span>
             </td>
-            <td>{{ formatNumber(r.sold) }}</td>
+            <td>
+              {{ formatNumber(r.sold) }}
+              <span v-if="r.estimated_lost" class="muted sub">
+                +{{ formatNumber(r.estimated_lost) }} gemist
+              </span>
+            </td>
             <td>{{ formatPct(r.growth_pct) }}</td>
             <td>{{ formatPct(r.safety_pct) }}</td>
             <td><strong>{{ formatNumber(r.advised) }}</strong></td>
@@ -317,11 +391,12 @@ watch(compareTo, async () => {
         </tfoot>
       </table>
       <p class="muted small">
-        Advies = verkocht × (1 + groei) × (1 + veiligheid), afgerond naar boven op hele
+        Advies = vraag × (1 + groei) × (1 + veiligheid), afgerond naar boven op hele
         verpakkingen. <strong>Restant</strong> is wat je daardoor te veel koopt: je kan geen halve
         bak bestellen en ook geen halve terugbrengen, dus dat blijft over. Producten die uitverkocht
-        raakten krijgen automatisch 25% veiligheid in plaats van {{ safetyPct }}%: die verkochten
-        wat er stond, niet wat mensen wilden.
+        raakten tellen niet alleen wat verkocht is: waar er genoeg gegevens zijn, wordt geschat
+        wat ze zouden verkocht hebben en telt dat mee als vraag. Lukt dat niet, dan krijgen ze
+        25% veiligheid in plaats van {{ safetyPct }}%.
       </p>
     </section>
   </div>

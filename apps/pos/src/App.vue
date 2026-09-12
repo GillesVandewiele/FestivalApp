@@ -7,6 +7,7 @@ import StaffPicker from './components/StaffPicker.vue'
 import SyncBadge from './components/SyncBadge.vue'
 import TotalBar from './components/TotalBar.vue'
 import { enqueue, voidQueued } from './db/outbox'
+import { soldOutIds, toggle as toggleStockout } from './db/stockouts'
 import { useCart } from './stores/cart'
 import { useQueue } from './stores/queue'
 import { useSession, type Product } from './stores/session'
@@ -27,12 +28,21 @@ const enrolError = ref('')
  */
 const staffMode = ref(false)
 
+/**
+ * Stock mode. Marking a drink sold out is deliberately behind an explicit mode
+ * rather than a gesture on the button: a mis-tap that locks a product out for the
+ * night is a much worse failure than one extra tap. Inside the mode the same tap
+ * puts it back, so nothing is one-way.
+ */
+const stockMode = ref(false)
+
 const staffName = computed(
   () => session.catalog?.staff.find((s) => s.id === session.staffId)?.name ?? '',
 )
 
 onMounted(async () => {
   await session.load()
+  soldOut.value = await soldOutIds()
   if (session.token) {
     try {
       await session.refresh()
@@ -61,11 +71,29 @@ async function onEnrol(token: string) {
   enrolError.value = ''
   try {
     await session.enrol(token)
-    queue.start()
-  } catch {
+    await queue.relinked() // clears the unlinked state and drains what was waiting
+  } catch (e) {
     session.token = null
-    enrolError.value = 'Koppelen mislukt. Controleer de code en de verbinding.'
+    enrolError.value =
+      (e as { status?: number }).status === 401
+        ? 'Deze code werkt niet. Vraag een nieuwe in de beheerdersapp.'
+        : 'Koppelen mislukt. Controleer de verbinding.'
   }
+}
+
+async function unlink() {
+  queue.stop()
+  await session.unlink()
+}
+
+async function onProductTap(p: Product) {
+  if (!stockMode.value) {
+    cart.add(p)
+    return
+  }
+  await toggleStockout(p.id, session.now())
+  soldOut.value = await soldOutIds()
+  void queue.drain() // stock changes reach the organiser as soon as there is signal
 }
 
 async function commit() {
@@ -102,42 +130,81 @@ function switchStaff() {
 </script>
 
 <template>
-  <EnrolScreen v-if="!session.token" :error="enrolError" @enrol="onEnrol" />
+  <EnrolScreen
+    v-if="!session.token"
+    :error="enrolError"
+    :queued="queue.pendingCount"
+    @enrol="onEnrol"
+  />
 
   <StaffPicker
     v-else-if="!session.staffId && session.catalog"
     :staff="session.catalog.staff"
     :bar-name="session.catalog.bar.name"
     @choose="session.chooseStaff"
+    @unlink="unlink"
   />
 
   <div v-else-if="session.catalog" class="app">
+    <!--
+      An expired code is not a network problem. Saying "offline" sends staff to check
+      the wifi when the fix is to enter a new code.
+    -->
+    <div v-if="queue.unlinked" class="alert">
+      <span>
+        Deze tablet is niet meer gekoppeld. Verkopen blijven bewaard, maar worden pas
+        verstuurd na een nieuwe code.
+      </span>
+      <button @click="unlink">Nieuwe code invoeren</button>
+    </div>
     <header>
       <span class="bar-name">{{ session.catalog.bar.name }}</span>
       <button
         class="mode"
         :class="{ on: staffMode }"
         :aria-pressed="staffMode"
+        :disabled="stockMode"
         @click="staffMode = !staffMode"
       >
         personeel
       </button>
+      <button
+        class="mode stock"
+        :class="{ on: stockMode }"
+        :aria-pressed="stockMode"
+        @click="stockMode = !stockMode"
+      >
+        voorraad<span v-if="soldOut.size" class="count">{{ soldOut.size }}</span>
+      </button>
       <button class="staff" @click="switchStaff">{{ staffName }}</button>
       <SyncBadge :online="queue.online" :pending="queue.pendingCount" />
     </header>
+
+    <div v-if="stockMode" class="stockbar">
+      Tik een drank aan om ze op <em>op</em> te zetten, of terug in voorraad. Niets gaat
+      verloren: nog eens tikken zet het meteen terug.
+      <button @click="stockMode = false">Klaar</button>
+    </div>
 
     <ProductGrid
       :products="session.catalog.products"
       :categories="session.catalog.categories ?? []"
       :qty-of="cart.qtyOf"
       :sold-out="soldOut"
-      @add="cart.add"
+      :stock-mode="stockMode"
+      @add="onProductTap"
       @remove="(p) => cart.remove(p.id)"
     />
 
-    <OrderStrip :lines="cart.lines" @remove="cart.remove" @clear="cart.clear" />
+    <OrderStrip
+      v-if="!stockMode"
+      :lines="cart.lines"
+      @remove="cart.remove"
+      @clear="cart.clear"
+    />
 
     <TotalBar
+      v-if="!stockMode"
       :total="cart.totalCoupons"
       :staff-mode="staffMode"
       :can-undo="lastOrderId !== null"
@@ -158,9 +225,16 @@ function switchStaff() {
 header {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   padding: 10px var(--gap);
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap; /* a narrow screen wraps rather than pushing the page sideways */
+}
+.bar-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .bar-name {
   font-weight: 800;
@@ -177,6 +251,48 @@ header {
   font: inherit;
   font-size: 14px;
   cursor: pointer;
+}
+.mode:disabled {
+  opacity: 0.35;
+}
+.mode.stock.on {
+  border-color: var(--queued);
+  background: color-mix(in srgb, var(--queued) 20%, transparent);
+  color: var(--queued);
+}
+.count {
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--queued);
+  color: #17130f;
+  font-size: 12px;
+  font-weight: 800;
+}
+.stockbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px var(--gap);
+  background: color-mix(in srgb, var(--queued) 16%, var(--bg));
+  border-bottom: 1px solid var(--queued);
+  font-size: 15px;
+}
+.stockbar em {
+  color: var(--undo);
+  font-style: normal;
+  font-weight: 700;
+}
+.stockbar button {
+  margin-left: auto;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--text);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
 }
 .mode.on {
   border-color: var(--staff);
@@ -196,6 +312,27 @@ header {
 }
 .staff:active {
   background: var(--surface-press);
+}
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px var(--gap);
+  background: color-mix(in srgb, var(--undo) 22%, var(--bg));
+  border-bottom: 1px solid var(--undo);
+  font-size: 15px;
+}
+.alert button {
+  margin-left: auto;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--text);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
 }
 .loading {
   padding: 24px;

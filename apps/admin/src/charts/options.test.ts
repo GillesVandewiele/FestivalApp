@@ -123,3 +123,23 @@ describe('hourly chart', () => {
     expect(Array.isArray(o.yAxis)).toBe(false)
   })
 })
+
+describe('stacked hourly metrics', () => {
+  it('labels the axis for the metric being stacked', () => {
+    const o = hourlyStackedOption(stack, 'revenue_eur') as unknown as {
+      yAxis: { name: string }
+    }
+    expect(o.yAxis.name).toContain('omzet')
+  })
+
+  it('formats euro values in the tooltip but not counts', () => {
+    const euros = hourlyStackedOption(stack, 'margin_eur') as unknown as {
+      tooltip: { valueFormatter: (v: number) => string }
+    }
+    const counts = hourlyStackedOption(stack, 'qty') as unknown as {
+      tooltip: { valueFormatter: (v: number) => string }
+    }
+    expect(euros.tooltip.valueFormatter(12.5)).toBe('€ 12.50')
+    expect(counts.tooltip.valueFormatter(12)).toBe('12')
+  })
+})

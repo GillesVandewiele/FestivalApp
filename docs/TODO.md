@@ -154,8 +154,6 @@ Listed so their absence is not mistaken for an oversight.
 - **Reassigning an order to a different staff member** after the fact. The spec mentions
   it; no endpoint exists and nobody has needed it.
 - **The last-ten-orders undo list.** Single-level undo covers the common mis-tap.
-- **Stockout marking from the tablet.** The backend accepts it and the reports use it, but
-  the POS has no `OP!` gesture yet: it needs settling on real hardware first.
 - **Waste analysis.** See question 5.
 - **A second organiser account with limited rights.** Everyone who logs in can change
   everything.

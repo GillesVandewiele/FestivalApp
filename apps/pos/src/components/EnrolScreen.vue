@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-defineProps<{ error: string }>()
+defineProps<{ error: string; queued?: number }>()
 const emit = defineEmits<{ enrol: [string] }>()
 
 const token = ref('')
@@ -19,6 +19,12 @@ async function submit() {
   <form class="enrol" @submit.prevent="submit">
     <h1>Tablet koppelen</h1>
     <p>Plak de apparaatcode uit de beheerdersapp. Dit hoeft maar één keer.</p>
+    <p v-if="queued" class="queued">
+      Er {{ queued === 1 ? 'staat' : 'staan' }} nog {{ queued }}
+      {{ queued === 1 ? 'bestelling' : 'bestellingen' }} klaar op deze tablet. Die
+      {{ queued === 1 ? 'wordt' : 'worden' }} verstuurd zodra de koppeling weer werkt, en
+      {{ queued === 1 ? 'gaat' : 'gaan' }} niet verloren.
+    </p>
     <input
       v-model="token"
       autocomplete="off"

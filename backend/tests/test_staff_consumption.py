@@ -86,3 +86,12 @@ async def test_the_staff_report_is_empty_when_nobody_took_anything(db, festival)
     assert result["drinks"] == 0
     assert result["value_eur"] == 0
     assert result["per_product"] == []
+
+
+async def test_the_staff_report_breaks_down_by_bar(db, with_staff_drinks):
+    """Which bar the free drinks came from is worth knowing when one runs dry."""
+    result = await stats.staff_consumption(db, with_staff_drinks["e26"].id)
+
+    assert [r["name"] for r in result["per_bar"]] == ["Hoofdpodium"]
+    assert result["per_bar"][0]["drinks"] == 4
+    assert result["per_bar"][0]["value_eur"] == 10.0

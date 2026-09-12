@@ -13,6 +13,8 @@ export type HourMetric = 'qty' | 'revenue_eur' | 'margin_eur'
 
 export interface HourStack {
   hours: number[]
+  metric?: HourMetric
+  excluded?: string[]
   series: { name: string; data: number[] }[]
 }
 
@@ -71,14 +73,23 @@ export function hourlyOption(rows: HourRow[], metric: HourMetric = 'qty'): EChar
  * ninth generated hue is never an option, and the legend carries identity so colour
  * is never the only encoding.
  */
-export function hourlyStackedOption(stack: HourStack): EChartsCoreOption {
+export function hourlyStackedOption(
+  stack: HourStack,
+  metric: HourMetric = 'qty',
+): EChartsCoreOption {
   const theme = activeTheme()
   const base = baseOption(theme)
   const last = stack.series.length - 1
+  const euros = metric !== 'qty'
 
   return {
     ...base,
-    tooltip: { ...base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow' } },
+    tooltip: {
+      ...base.tooltip,
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      valueFormatter: (v: number) => (euros ? `€ ${v.toFixed(2)}` : String(v)),
+    },
     legend: {
       data: stack.series.map((s) => s.name),
       textStyle: { color: theme.inkDim },
@@ -92,7 +103,7 @@ export function hourlyStackedOption(stack: HourStack): EChartsCoreOption {
       data: stack.hours.map((h) => `${String(h).padStart(2, '0')}u`),
       splitLine: { show: false },
     },
-    yAxis: { ...base.axisCommon, type: 'value', name: 'consumpties' },
+    yAxis: { ...base.axisCommon, type: 'value', name: METRIC_AXIS[metric] },
     series: stack.series.map((s, i) => ({
       type: 'bar',
       stack: 'uur',
