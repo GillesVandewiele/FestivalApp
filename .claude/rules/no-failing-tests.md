@@ -7,6 +7,20 @@ cd backend && uv run pytest --tb=short > "$SCRATCH/pytest.log" 2>&1
 tail -n 40 "$SCRATCH/pytest.log"
 ```
 
+## Read the exit code, not the output
+
+Grepping a test log for a passing count will happily report success while a suite
+failed alongside it. `Tests 32 passed` and `Test Files 1 failed` appear in the same
+output. Check `$?`, or grep for failure, never only for success.
+
+```bash
+uv run pytest -q > "$SCRATCH/pytest.log" 2>&1; echo "exit=$?"
+npm test > "$SCRATCH/vitest.log" 2>&1; echo "exit=$?"
+```
+
+This has bitten once already: a narrow grep hid a broken vitest collection and a red
+build reached main.
+
 A single failure is enough to stop. Before calling a failure pre-existing:
 
 1. Run it in isolation: `uv run pytest tests/test_x.py::test_name -v`.
