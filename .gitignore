@@ -39,3 +39,6 @@ packages/*/dist/
 *.log
 playwright-report/
 test-results/
+
+# ---- local test tooling ----
+.tools/
