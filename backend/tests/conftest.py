@@ -133,3 +133,17 @@ def reset_rate_limiter():
 
 
 pytest_plugins = ["tests.conftest_stats"]
+
+
+@pytest_asyncio.fixture
+async def anon_client(app):
+    """A second client that has never logged in.
+
+    `auth_client` logs in on the same object `client` yields, so any test whose
+    fixtures pull in `auth_client` gets an authenticated `client` too. Tests that
+    assert an endpoint rejects anonymous callers must use this instead, or they
+    pass for the wrong reason.
+    """
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="https://testserver.local") as c:
+        yield c

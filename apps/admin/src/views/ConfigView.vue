@@ -40,7 +40,9 @@ function blankDraft() {
 async function load() {
   error.value = ''
   if (tab.value === 'devices') {
-    rows.value = (await auth.client.listDevices()) as Row[]
+    // Ingetrokken toestellen verdwijnen uit de lijst: ze bestaan nog in de database
+    // zodat oude verkopen toegewezen blijven, maar ze zijn geen keuze meer.
+    rows.value = ((await auth.client.listDevices()) as Row[]).filter((d) => !d.revoked_at)
   } else {
     const scoped = tab.value === 'editions' ? undefined : (editionId.value ?? undefined)
     rows.value = (await auth.client.list(tab.value, scoped)) as Row[]
@@ -75,6 +77,14 @@ async function create() {
 
 async function patch(row: Row, field: string, value: unknown) {
   await auth.client.update(tab.value, row.id, { [field]: value })
+  await load()
+}
+
+async function rotate(row: Row) {
+  const d = (await auth.client.rotateDevice(row.id)) as { label: string; token: string }
+  // Shown once, same as a fresh enrolment. The previous code stopped working
+  // the moment this call returned.
+  newToken.value = { label: d.label, token: d.token }
   await load()
 }
 
@@ -124,7 +134,10 @@ watch([tab, editionId], load)
 
     <div v-if="newToken" class="token card">
       <h2>Apparaatcode voor {{ newToken.label }}</h2>
-      <p class="muted">Deze code is maar één keer zichtbaar. Plak hem nu in de bar-app.</p>
+      <p class="muted">
+        Deze code is maar één keer zichtbaar. Plak hem nu in de bar-app. Een eerdere code van
+        dit toestel werkt niet meer.
+      </p>
       <code>{{ newToken.token }}</code>
       <button @click="newToken = null">Sluiten</button>
     </div>
@@ -166,6 +179,12 @@ watch([tab, editionId], load)
         De slug blijft gelijk over de jaren heen. Daarop worden edities met elkaar vergeleken, dus
         hernoem je een product gerust, maar wijzig de slug niet.
       </p>
+      <p v-if="tab === 'products'" class="muted small">
+        <strong>Verpakking</strong> en <strong>stuks erin</strong> beschrijven hoe je inkoopt: een
+        bak van 24, een doos van 6. Het inkoopadvies rondt daarmee af naar boven naar hele
+        verpakkingen, want je koopt geen halve bak en je brengt er ook geen halve terug. De
+        inkoopprijs geldt per stuk, niet per verpakking.
+      </p>
     </section>
 
     <section class="card">
@@ -174,7 +193,7 @@ watch([tab, editionId], load)
         <thead>
           <tr>
             <th>Naam</th><th>Slug</th><th>Bonnetjes</th><th>Inkoop €</th>
-            <th>Eenheid</th><th>Per stuk</th>
+            <th>Verpakking</th><th>Stuks erin</th>
             <th v-for="b in barsForEdition" :key="b.id">{{ b.name }}</th>
             <th></th>
           </tr>
@@ -207,7 +226,7 @@ watch([tab, editionId], load)
           <tr>
             <th>Naam</th>
             <th v-if="tab === 'devices'">Laatst gezien</th>
-            <th v-if="tab === 'devices'">Status</th>
+
             <th v-if="tab === 'editions'">Waarde bonnetje</th>
             <th></th>
           </tr>
@@ -218,10 +237,11 @@ watch([tab, editionId], load)
             <td v-if="tab === 'devices'" class="muted">
               {{ r.last_seen_at ? new Date(r.last_seen_at as string).toLocaleString('nl-BE') : 'nog nooit' }}
             </td>
-            <td v-if="tab === 'devices'">{{ r.revoked_at ? 'ingetrokken' : 'actief' }}</td>
+
             <td v-if="tab === 'editions'">€ {{ r.coupon_value_eur }}</td>
-            <td>
-              <button v-if="!(tab === 'devices' && r.revoked_at)" @click="remove(r)">
+            <td class="actions">
+              <button v-if="tab === 'devices'" @click="rotate(r)">Nieuwe code</button>
+              <button @click="remove(r)">
                 {{ tab === 'devices' ? 'Intrekken' : 'Verwijderen' }}
               </button>
             </td>
@@ -240,6 +260,7 @@ watch([tab, editionId], load)
 .form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-dim); }
 .mini { width: 84px; }
 .error { color: var(--bad); font-weight: 600; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; }
 .token code {
   display: block; margin: 10px 0; padding: 12px; border-radius: 8px;
   background: var(--surface); border: 1px solid var(--line);

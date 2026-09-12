@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EChart from '../charts/EChart.vue'
 import { hourlyOption, type HourRow } from '../charts/options'
 import { formatEur, formatNumber } from '../charts/theme'
@@ -12,13 +12,20 @@ const POLL_MS = 15000
 const auth = useAuth()
 const editions = useEditions()
 
-const overview = ref<Record<string, number> | null>(null)
+const overview = ref<Record<string, number | null> | null>(null)
 const products = ref<{ name: string; qty: number; coupons: number }[]>([])
 const bars = ref<{ name: string; qty: number; coupons: number }[]>([])
 const staff = ref<{ name: string; orders: number; qty: number; voided: number }[]>([])
 const hours = ref<HourRow[]>([])
 const updatedAt = ref('')
 const failed = ref(false)
+
+/** Margin only counts products whose cost price is entered, so say what it omits. */
+const marginNote = computed(() => {
+  const missing = overview.value?.cost_missing ?? 0
+  if (missing === 0) return undefined
+  return `zonder ${missing} product${missing === 1 ? '' : 'en'} zonder inkoopprijs`
+})
 
 let timer: ReturnType<typeof setInterval> | undefined
 
@@ -75,6 +82,11 @@ watch(() => editions.currentId, refresh)
       <StatTile label="Consumpties" :value="formatNumber(overview?.drinks)" />
       <StatTile label="Bonnetjes" :value="formatNumber(overview?.coupons)" />
       <StatTile label="Omzet" :value="formatEur(overview?.revenue_eur)" />
+      <StatTile
+        label="Marge"
+        :value="formatEur(overview?.margin_eur)"
+        :note="marginNote"
+      />
       <StatTile
         label="Bestellingen"
         :value="formatNumber(overview?.orders)"

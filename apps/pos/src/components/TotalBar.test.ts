@@ -35,11 +35,21 @@ describe('TotalBar', () => {
     expect(bar.emitted('commit')).toHaveLength(1)
   })
 
-  it('shows undo only when there is something to undo', async () => {
-    const bar = mount(TotalBar, { props: { total: 0, canUndo: true } })
-    expect(bar.find('[data-test=undo]').exists()).toBe(true)
-    await bar.setProps({ canUndo: false })
-    expect(bar.find('[data-test=undo]').exists()).toBe(false)
+  it('always shows undo, disabled when there is nothing to undo', async () => {
+    // Rendering it only after the first sale made it undiscoverable, and made the
+    // bar jump when it appeared. It is always present and disabled instead.
+    const bar = mount(TotalBar, { props: { total: 0, canUndo: false } })
+    const undo = bar.get('[data-test=undo]')
+    expect(undo.attributes('disabled')).toBeDefined()
+
+    await bar.setProps({ canUndo: true })
+    expect(bar.get('[data-test=undo]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('does not emit undo while disabled', async () => {
+    const bar = mount(TotalBar, { props: { total: 0, canUndo: false } })
+    await bar.get('[data-test=undo]').trigger('click')
+    expect(bar.emitted('undo')).toBeUndefined()
   })
 
   it('emits undo when the undo button is tapped', async () => {

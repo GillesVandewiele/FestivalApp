@@ -42,6 +42,10 @@ install-web:  ## Install frontend dependencies
 seed:  ## Load demo data and print device tokens for the POS app
 	cd backend && uv run python -m app.seed
 
+.PHONY: seed-demo
+seed-demo:  ## Load three editions of realistic demo sales for the reports
+	cd backend && uv run python -m app.seed_demo
+
 .PHONY: dev-pos
 dev-pos:  ## Run the POS app (reachable from a tablet on your wifi)
 	npm run dev:pos

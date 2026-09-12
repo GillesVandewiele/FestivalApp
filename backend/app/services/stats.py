@@ -40,11 +40,21 @@ async def overview(db: AsyncIOMotorDatabase, edition_id: str) -> dict:
     row = rows[0] if rows else {"orders": 0, "coupons": 0, "drinks": 0}
     voided = await db.orders.count_documents({"edition_id": edition_id, "status": "voided"})
 
+    # Margin reuses by_product so the "unknown cost" rule lives in exactly one
+    # place. Summing only the priced products keeps the figure honest, and
+    # cost_missing says how much of the assortment it leaves out.
+    products = await by_product(db, edition_id)
+    priced = [p for p in products if p["cost_known"]]
+    margin = _round2(sum(p["margin_eur"] for p in priced)) if priced else None
+
     return {
         "orders": row["orders"],
         "drinks": row["drinks"],
         "coupons": row["coupons"],
         "revenue_eur": _round2(row["coupons"] * value),
+        "cost_eur": _round2(sum(p["cost_eur"] for p in priced)) if priced else None,
+        "margin_eur": margin,
+        "cost_missing": len(products) - len(priced),
         "voided_orders": voided,
     }
 

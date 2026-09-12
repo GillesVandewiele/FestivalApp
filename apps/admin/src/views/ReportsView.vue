@@ -24,6 +24,8 @@ interface AdviceRow {
   purchase_unit: string | null
   unit_size: number | null
   units_to_order: number | null
+  total_units: number | null
+  surplus_units: number | null
   cost_eur: number | null
   cost_known: boolean
   had_stockout: boolean
@@ -47,6 +49,9 @@ const totalCost = computed(() =>
   advice.value.some((r) => r.cost_known)
     ? advice.value.reduce((s, r) => s + (r.cost_eur ?? 0), 0)
     : null,
+)
+const totalSurplus = computed(() =>
+  advice.value.reduce((s, r) => s + (r.surplus_units ?? 0), 0),
 )
 const editionName = computed(() => editions.byId(editions.currentId)?.name ?? '')
 const compareName = computed(() => editions.byId(compareTo.value)?.name ?? '')
@@ -237,8 +242,8 @@ watch(compareTo, async () => {
       <table>
         <thead>
           <tr>
-            <th>Product</th><th>Verkocht</th><th>Groei</th><th>Marge</th>
-            <th>Advies</th><th>Eenheid</th><th>Bestellen</th><th>Kost</th>
+            <th>Product</th><th>Verkocht</th><th>Groei</th><th>Veiligheid</th>
+            <th>Advies</th><th>Verpakking</th><th>Te bestellen</th><th>Restant</th><th>Kost</th>
           </tr>
         </thead>
         <tbody>
@@ -254,18 +259,28 @@ watch(compareTo, async () => {
             <td>{{ formatPct(r.safety_pct) }}</td>
             <td><strong>{{ formatNumber(r.advised) }}</strong></td>
             <td class="muted">{{ r.purchase_unit ? `${r.purchase_unit} van ${r.unit_size}` : '—' }}</td>
-            <td>{{ formatNumber(r.units_to_order) }}</td>
+            <td>
+              {{ formatNumber(r.units_to_order) }}
+              <span v-if="r.total_units" class="muted sub">= {{ formatNumber(r.total_units) }}</span>
+            </td>
+            <td class="muted">{{ r.surplus_units === null ? '—' : `+${formatNumber(r.surplus_units)}` }}</td>
             <td :class="{ muted: !r.cost_known }">{{ formatEur(r.cost_eur) }}</td>
           </tr>
         </tbody>
         <tfoot>
-          <tr><td colspan="7"><strong>Totaal</strong></td><td><strong>{{ formatEur(totalCost) }}</strong></td></tr>
+          <tr>
+            <td colspan="7"><strong>Totaal</strong></td>
+            <td class="muted">+{{ formatNumber(totalSurplus) }}</td>
+            <td><strong>{{ formatEur(totalCost) }}</strong></td>
+          </tr>
         </tfoot>
       </table>
       <p class="muted small">
-        Advies = verkocht × (1 + groei) × (1 + veiligheidsmarge), afgerond naar boven op hele
-        eenheden. Producten die uitverkocht raakten krijgen automatisch 25% marge in plaats van
-        {{ safetyPct }}%: die verkochten wat er stond, niet wat mensen wilden.
+        Advies = verkocht × (1 + groei) × (1 + veiligheid), afgerond naar boven op hele
+        verpakkingen. <strong>Restant</strong> is wat je daardoor te veel koopt: je kan geen halve
+        bak bestellen en ook geen halve terugbrengen, dus dat blijft over. Producten die uitverkocht
+        raakten krijgen automatisch 25% veiligheid in plaats van {{ safetyPct }}%: die verkochten
+        wat er stond, niet wat mensen wilden.
       </p>
     </section>
   </div>
@@ -331,6 +346,10 @@ watch(compareTo, async () => {
 }
 .small {
   font-size: 13px;
+}
+.sub {
+  font-size: 12px;
+  margin-left: 6px;
 }
 tfoot td {
   border-bottom: none;
