@@ -45,7 +45,11 @@ export async function toggle(productId: string, at: Date): Promise<boolean> {
 
 /** Product ids that are out right now. */
 export async function soldOutIds(): Promise<Set<string>> {
-  const rows = await db.stockouts.toArray()
+  // Sorted by when it happened, not by primary key. A drink that went out, came
+  // back, and went out again has two records, and only the later one describes the
+  // present. Dexie returns rows in key order, which for random uuids is arbitrary,
+  // so folding them unsorted gave whichever answer the ids happened to produce.
+  const rows = (await db.stockouts.toArray()).sort((a, b) => a.out_at.localeCompare(b.out_at))
   const out = new Set<string>()
   for (const r of rows) {
     if (r.back_at === null) out.add(r.product_id)

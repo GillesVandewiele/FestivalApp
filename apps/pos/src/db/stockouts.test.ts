@@ -44,6 +44,28 @@ describe('stockouts on the tablet', () => {
     expect(await db.stockouts.count()).toBe(2)
   })
 
+  it('reads the current state from the latest record, not from row order', async () => {
+    // Dexie returns rows in primary-key order, and the keys are random uuids. The
+    // fold has to sort by time or the answer depends on which uuid sorted first.
+    const closed = { id: 'zzzz', product_id: 'p1', out_at: AT.toISOString(),
+                     back_at: LATER.toISOString(), synced: 1 as const }
+    const open = { id: 'aaaa', product_id: 'p1',
+                   out_at: '2026-07-02T01:00:00.000Z', back_at: null, synced: 0 as const }
+    await db.stockouts.bulkPut([closed, open])
+
+    expect([...(await soldOutIds())]).toEqual(['p1'])
+
+    await db.stockouts.clear()
+    // And the mirror image: the later record closes the window.
+    await db.stockouts.bulkPut([
+      { ...open, id: 'zzzz', out_at: AT.toISOString(), back_at: null },
+      { ...closed, id: 'aaaa', out_at: '2026-07-02T01:00:00.000Z',
+        back_at: '2026-07-02T02:00:00.000Z' },
+    ])
+
+    expect([...(await soldOutIds())]).toEqual([])
+  })
+
   it('marking out twice does not create a second open record', async () => {
     await toggle('p1', AT)
     await db.stockouts.toArray()
