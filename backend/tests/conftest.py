@@ -5,8 +5,16 @@ import tempfile
 import time
 from pathlib import Path
 
+import httpx
 import pytest
+import pytest_asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
+
+from app.config import Settings
+from app.main import create_app
+from app.middleware import limiter
+from app.models.identity import User
+from app.security import hash_password
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -63,3 +71,62 @@ async def db(mongo_uri: str):
     yield client[name]
     await client.drop_database(name)
     client.close()
+
+
+@pytest.fixture
+def settings(mongo_uri: str) -> "Settings":
+    return Settings(
+        _env_file=None,
+        mongo_uri=mongo_uri,
+        mongo_db="festival_test",
+        jwt_secret="j" * 48,
+        device_token_pepper="p" * 48,
+        cors_origins=["https://pos.test"],
+        cookie_secure=True,
+    )
+
+
+@pytest_asyncio.fixture
+async def app(settings, db):
+    application = create_app(settings)
+    async with application.router.lifespan_context(application):
+        yield application
+
+
+@pytest_asyncio.fixture
+async def client(app):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="https://testserver.local") as c:
+        yield c
+
+
+@pytest.fixture
+def make_user(db):
+    async def _make(email: str, password: str, role: str = "organizer") -> "User":
+        user = User(email=email, password_hash=hash_password(password), role=role)
+        await db.users.insert_one(user.to_mongo())
+        return user
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def auth_client(client, make_user):
+    await make_user("organiser@example.com", "hunter2hunter2")
+    await client.post(
+        "/api/v1/auth/login",
+        json={"email": "organiser@example.com", "password": "hunter2hunter2"},
+    )
+    return client
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """The limiter is a module-level singleton, so its counters leak between tests.
+
+    Without this, the eleventh login in a suite run gets a 429 and every later test
+    that needs a session fails with a confusing 401.
+    """
+    limiter.reset()
+    yield
+    limiter.reset()
