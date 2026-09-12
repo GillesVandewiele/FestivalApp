@@ -60,3 +60,7 @@ mongo-start:  ## Start a local MongoDB on port 27017 in the background
 .PHONY: mongo-stop
 mongo-stop:  ## Stop the local MongoDB
 	@MONGOD=$$(./scripts/dev-mongo.sh) ; $$MONGOD --dbpath .tools/data --shutdown || true
+
+.PHONY: dev-admin
+dev-admin:  ## Run the organiser app on :5174
+	npm run dev --workspace apps/admin

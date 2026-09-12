@@ -40,6 +40,8 @@ jobs:
       - run: npm ci
       - run: npm run test --workspace apps/pos
       - run: npm run build --workspace apps/pos
+      - run: npm run test --workspace apps/admin
+      - run: npm run build --workspace apps/admin
 
   secrets:
     runs-on: ubuntu-latest

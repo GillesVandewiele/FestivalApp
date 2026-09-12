@@ -13,7 +13,7 @@ so next year's stock order can be based on what actually happened rather than on
 |---|---|
 | Backend API | Built and tested |
 | POS app (bar tablets) | Built and testable locally |
-| Admin app (organisers) | Not started, plans 3 and 4 |
+| Admin app (organisers) | Built and testable locally |
 
 ## Documentation
 
@@ -32,6 +32,13 @@ make mongo-start            # local database on port 27017
 make seed                   # demo festival; prints a device token per bar
 make dev                    # the API on :8000       (leave this running)
 make dev-pos                # the POS app on :5173   (second terminal)
+make dev-admin              # organiser app on :5174 (third terminal)
+```
+
+Create an organiser login once, while the database is running:
+
+```bash
+cd backend && uv run python -m app.cli create-organiser you@example.com
 ```
 
 Open http://localhost:5173, paste one of the tokens `make seed` printed, pick a name, and

@@ -1,0 +1,126 @@
+:root {
+  --surface: #fcfcfb;
+  --surface-2: #ffffff;
+  --line: #e7e6e1;
+  --ink: #1a1a19;
+  --ink-dim: #5f5e58;
+  --accent: #2a78d6;
+  --good: #1baf7a;
+  --warn: #eda100;
+  --bad: #e34948;
+  --radius: 10px;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'],
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --surface: #1a1a19;
+    --surface-2: #232320;
+    --line: #33322e;
+    --ink: #ffffff;
+    --ink-dim: #c3c2b7;
+    --accent: #3987e5;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --surface: #1a1a19;
+  --surface-2: #232320;
+  --line: #33322e;
+  --ink: #ffffff;
+  --ink-dim: #c3c2b7;
+  --accent: #3987e5;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font:
+    400 15px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+h2 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+th,
+td {
+  padding: 8px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+th {
+  color: var(--ink-dim);
+  font-weight: 600;
+  font-size: 13px;
+}
+.muted {
+  color: var(--ink-dim);
+}
+.card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+}
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+input,
+select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+a {
+  color: var(--accent);
+}

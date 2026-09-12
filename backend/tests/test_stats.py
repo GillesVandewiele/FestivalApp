@@ -129,3 +129,36 @@ async def test_bar_coupons_sum_to_the_overview_total(db, festival):
     per_bar = await stats.by_bar(db, festival["e26"].id)
 
     assert sum(r["coupons"] for r in per_bar) == total["coupons"]
+
+
+async def test_hours_are_ordered_as_the_night_was_lived(db, festival):
+    """A festival running past midnight has hours like 22, 23, 0, 1. Sorting those
+    numerically claims the evening started at midnight."""
+    from app.services.stats import _chronological
+
+    overnight = [
+        {"hour_local": 0, "qty": 5, "coupons": 5},
+        {"hour_local": 1, "qty": 3, "coupons": 3},
+        {"hour_local": 22, "qty": 9, "coupons": 9},
+        {"hour_local": 23, "qty": 7, "coupons": 7},
+    ]
+    assert [r["hour_local"] for r in _chronological(overnight)] == [22, 23, 0, 1]
+
+
+async def test_an_afternoon_only_edition_is_left_alone(db, festival):
+    from app.services.stats import _chronological
+
+    daytime = [
+        {"hour_local": 14, "qty": 1, "coupons": 1},
+        {"hour_local": 15, "qty": 2, "coupons": 2},
+        {"hour_local": 16, "qty": 3, "coupons": 3},
+    ]
+    assert [r["hour_local"] for r in _chronological(daytime)] == [14, 15, 16]
+
+
+async def test_a_single_hour_is_left_alone(db, festival):
+    from app.services.stats import _chronological
+
+    assert _chronological([{"hour_local": 3, "qty": 1, "coupons": 1}]) == [
+        {"hour_local": 3, "qty": 1, "coupons": 1}
+    ]

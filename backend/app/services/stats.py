@@ -175,7 +175,30 @@ async def by_hour(db: AsyncIOMotorDatabase, edition_id: str, tz: str) -> list[di
         {"$sort": {"_id": 1}},
     ]
     rows = await db.orders.aggregate(pipeline).to_list(None)
-    return [{"hour_local": r["_id"], "qty": r["qty"], "coupons": r["coupons"]} for r in rows]
+    hours = [{"hour_local": r["_id"], "qty": r["qty"], "coupons": r["coupons"]} for r in rows]
+    return _chronological(hours)
+
+
+def _chronological(hours: list[dict]) -> list[dict]:
+    """Order the hours as the night was actually lived, not 0..23.
+
+    A festival that runs past midnight has hours like 18..23 plus 0..3. Sorting
+    numerically puts the after-midnight hours first, so the chart claims the
+    evening began at midnight. Rotating at the largest gap in the clock puts them
+    in the order people experienced them, and works for any start time without
+    needing to know one.
+    """
+    if len(hours) < 2:
+        return hours
+
+    present = [h["hour_local"] for h in hours]
+    gaps = [((present[(i + 1) % len(present)] - present[i]) % 24, i) for i in range(len(present))]
+    largest_gap, at = max(gaps)
+    if largest_gap <= 1:  # a contiguous run, already in order
+        return hours
+
+    start = (at + 1) % len(hours)
+    return hours[start:] + hours[:start]
 
 
 async def peak_per_bar(db: AsyncIOMotorDatabase, edition_id: str, tz: str) -> list[dict]:
