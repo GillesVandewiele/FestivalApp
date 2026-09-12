@@ -1,0 +1,105 @@
+Festival-verkoopapp – registratie en analyse van drankverkoop
+
+Ik wil een eenvoudige en gebruiksvriendelijke app laten ontwikkelen voor werknemers die tijdens een festival drankbestellingen van klanten registreren.
+
+Doel van de app
+
+Tijdens het festival kunnen medewerkers snel aanduiden wat een klant bestelt. Op het einde van het festival beschikken we daardoor over een duidelijk overzicht van welke dranken, hoeveelheden en eventueel op welke momenten er verkocht zijn.
+
+Deze gegevens willen we bewaren en analyseren om het jaar nadien betere beslissingen te kunnen nemen over:
+
+* hoeveel drank we moeten inkopen;
+* welke producten populair zijn;
+* welke producten minder goed verkopen;
+* hoeveel voorraad er per verkooppunt nodig is;
+* op welke momenten de grootste verkoop plaatsvindt.
+
+Werking voor de werknemer
+
+De app moet vooral supersnel en eenvoudig werken. Een medewerker moet met zo weinig mogelijk handelingen een bestelling kunnen registreren.
+
+Bijvoorbeeld:
+
+1. Medewerker opent de app.
+2. Medewerker kiest het verkooppunt.
+3. Medewerker tikt op de bestelde drank.
+4. De drank wordt toegevoegd aan de bestelling.
+5. Indien nodig kan hij/zij meerdere dranken toevoegen.
+6. De bestelling wordt bevestigd.
+7. De verkoop wordt automatisch opgeslagen.
+
+Er moet bijvoorbeeld gewerkt kunnen worden met grote, duidelijke knoppen zoals:
+
+BIER | WIJN | CAVA | COCKTAIL | WATER | FRISDRANK | KOFFIE | …
+
+Bij een bestelling van bijvoorbeeld 3 pintjes en 2 cola’s kan de medewerker eenvoudig op de producten tikken, waarna de aantallen automatisch worden bijgehouden.
+
+Overzicht tijdens het festival
+
+De organisator moet live kunnen zien:
+
+* totale verkochte aantallen;
+* verkoop per drank;
+* verkoop per verkooppunt;
+* verkoop per medewerker;
+* verkoop per uur;
+* eventueel omzet per product;
+* eventueel omzet per verkooppunt.
+
+Analyse na het festival
+
+Na afloop moet de app automatisch rapporten kunnen maken.
+
+Bijvoorbeeld:
+
+Festival 2026
+
+* Jupiler: 8.420
+* Witte wijn: 1.230
+* Cava: 860
+* Cola: 1.540
+* Water: 2.110
+* Gin-tonic: 740
+
+Daarnaast zou het interessant zijn om te kunnen zien wanneer de verkoop plaatsvond.
+
+Bijvoorbeeld:
+
+Verkoop per uur
+
+* 16:00–17:00 → 320 consumpties
+* 17:00–18:00 → 580
+* 18:00–19:00 → 940
+* 19:00–20:00 → 1.420
+* enz.
+
+Vergelijken met vorige edities
+
+Een belangrijk onderdeel is dat de gegevens van verschillende jaren bewaard blijven.
+
+Zo moet je bijvoorbeeld kunnen vergelijken:
+
+Festival 2025 vs. 2026
+
+Product	2025	2026	Verschil
+Bier	7.800	8.420	+620
+Cava	1.050	860	-190
+Water	1.700	2.110	+410
+
+Op basis hiervan kunnen we het volgende jaar beter voorspellen hoeveel voorraad er nodig zal zijn.
+
+Belangrijk
+
+De app moet ontworpen worden voor gebruik in een drukke festivalsituatie. De medewerker heeft weinig tijd en moet niet door verschillende menu’s moeten navigeren.
+
+De belangrijkste eigenschappen zijn daarom:
+
+* zeer eenvoudige bediening;
+* grote knoppen;
+* zo weinig mogelijk klikken;
+* snel registreren;
+* meerdere bestellingen snel na elkaar kunnen invoeren;
+* ook bij slechte internetverbinding betrouwbaar werken;
+* gegevens automatisch synchroniseren zodra er opnieuw verbinding is.
+
+Het einddoel is een systeem waarbij we na elk festival beschikken over een volledige dataset van onze drankverkoop, zodat we het jaar nadien op basis van echte cijfers kunnen bepalen wat, hoeveel en wanneer we moeten inkopen.
