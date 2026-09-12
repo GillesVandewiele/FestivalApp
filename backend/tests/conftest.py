@@ -130,3 +130,6 @@ def reset_rate_limiter():
     limiter.reset()
     yield
     limiter.reset()
+
+
+pytest_plugins = ["tests.conftest_stats"]
