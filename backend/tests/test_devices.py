@@ -11,9 +11,12 @@ async def enrolled(auth_client):
     return r.json()
 
 
-async def test_enrolment_returns_a_plaintext_token_once(enrolled):
+async def test_enrolment_returns_a_typeable_code_once(enrolled):
+    """Somebody types this into a tablet, so it is 12 characters in groups of four
+    rather than a 43-character url-safe blob."""
     assert enrolled["token"]
-    assert len(enrolled["token"]) >= 32
+    assert len(enrolled["token"]) == 14
+    assert enrolled["token"].count("-") == 2
 
 
 async def test_the_token_is_never_stored_in_plaintext(enrolled, db):
@@ -91,3 +94,45 @@ async def test_rotating_an_unknown_device_is_404(auth_client):
 async def test_rotation_requires_authentication(anon_client, enrolled):
     r = await anon_client.post(f"/api/v1/admin/devices/{enrolled['id']}/rotate")
     assert r.status_code == 401
+
+
+async def test_a_sloppily_retyped_code_still_authenticates(client, enrolled):
+    """Lowercase, no dashes, and a one typed as an ell all reach the same device."""
+    retyped = enrolled["token"].lower().replace("-", "")
+    r = await client.get("/api/v1/time", headers={"Authorization": f"Bearer {retyped}"})
+    assert r.status_code == 200
+
+
+async def test_guessing_codes_gets_the_address_blocked(client, enrolled):
+    """Twelve characters is only safe because guessing is rate limited."""
+    from app import throttle
+
+    throttle.reset()
+    for _ in range(throttle.MAX_FAILURES):
+        r = await client.get("/api/v1/time", headers={"Authorization": "Bearer WRONG-CODE-HERE"})
+        assert r.status_code == 401
+
+    blocked = await client.get("/api/v1/time", headers={"Authorization": "Bearer WRONG-CODE-HERE"})
+    assert blocked.status_code == 429
+
+    # The real code is refused too while the address is blocked, which is the point.
+    real = await client.get(
+        "/api/v1/time", headers={"Authorization": f"Bearer {enrolled['token']}"}
+    )
+    assert real.status_code == 429
+    throttle.reset()
+
+
+async def test_a_correct_code_clears_the_guess_counter(client, enrolled):
+    from app import throttle
+
+    throttle.reset()
+    for _ in range(throttle.MAX_FAILURES - 1):
+        await client.get("/api/v1/time", headers={"Authorization": "Bearer NOPE"})
+
+    ok = await client.get("/api/v1/time", headers={"Authorization": f"Bearer {enrolled['token']}"})
+    assert ok.status_code == 200
+
+    still_ok = await client.get("/api/v1/time", headers={"Authorization": "Bearer NOPE"})
+    assert still_ok.status_code == 401  # counter reset, not blocked
+    throttle.reset()

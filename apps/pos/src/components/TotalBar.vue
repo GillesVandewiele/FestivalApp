@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-const props = defineProps<{ total: number; canUndo: boolean }>()
+const props = defineProps<{ total: number; canUndo: boolean; staffMode?: boolean }>()
 const emit = defineEmits<{ commit: []; undo: [] }>()
 
 const DEBOUNCE_MS = 400
@@ -36,12 +36,17 @@ function commit() {
     <button
       data-test="commit"
       class="commit"
-      :class="{ idle: total === 0 }"
+      :class="{ idle: total === 0, staff: staffMode }"
       :disabled="total === 0"
       @click="commit"
     >
-      <span class="tnum">{{ total }}</span>
-      <span class="unit">{{ total === 1 ? 'bonnetje' : 'bonnetjes' }}</span>
+      <template v-if="staffMode">
+        <span class="unit">personeel &middot; geen bonnetjes</span>
+      </template>
+      <template v-else>
+        <span class="tnum">{{ total }}</span>
+        <span class="unit">{{ total === 1 ? 'bonnetje' : 'bonnetjes' }}</span>
+      </template>
       <span v-if="total > 0" class="tick">&check;</span>
     </button>
   </div>
@@ -118,6 +123,10 @@ function commit() {
   transform: translateY(-50%);
   font-size: 28px;
   font-weight: 700;
+}
+.commit.staff {
+  background: var(--staff);
+  color: #17130f;
 }
 .commit.idle {
   background: var(--surface);

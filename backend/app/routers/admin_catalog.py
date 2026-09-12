@@ -6,7 +6,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from ..deps import get_current_user, get_db
-from ..models.catalog import Bar, Edition, Product, Staff
+from ..models.catalog import Bar, Category, Edition, Product, Staff
 from ..models.common import MongoModel
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"], dependencies=[Depends(get_current_user)])
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"], dependencies=[Depends
 RESOURCES: dict[str, tuple[str, type[MongoModel]]] = {
     "editions": ("editions", Edition),
     "bars": ("bars", Bar),
+    "categories": ("categories", Category),
     "products": ("products", Product),
     "staff": ("staff", Staff),
 }
@@ -25,7 +26,9 @@ def _serialise(doc: dict) -> dict:
     return doc
 
 
-def _register(plural: str, collection: str, model: type[MongoModel]) -> None:
+def _register(
+    plural: str, collection: str, model: type[MongoModel], *, generic_delete: bool = True
+) -> None:
     singular = plural[:-1] if plural.endswith("s") else plural
 
     @router.get(f"/{plural}", name=f"list_{plural}")
@@ -67,6 +70,9 @@ def _register(plural: str, collection: str, model: type[MongoModel]) -> None:
             )
         return _serialise(doc)
 
+    if not generic_delete:
+        return
+
     @router.delete(
         f"/{plural}/{{item_id}}",
         status_code=status.HTTP_204_NO_CONTENT,
@@ -82,4 +88,35 @@ def _register(plural: str, collection: str, model: type[MongoModel]) -> None:
 
 
 for _plural, (_collection, _model) in RESOURCES.items():
-    _register(_plural, _collection, _model)
+    # Categories get their own delete below: it has to refuse while products use it.
+    _register(_plural, _collection, _model, generic_delete=(_plural != "categories"))
+
+
+@router.delete("/categories/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_category(item_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> Response:
+    """Refuse while products still sit in it, and say which ones.
+
+    Reassigning them silently would move drinks into a category nobody chose, and
+    deleting them with it would lose sales history.
+    """
+    category = await db.categories.find_one({"_id": item_id})
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="category not found")
+
+    in_use = [
+        p["name"]
+        async for p in db.products.find(
+            {"edition_id": category["edition_id"], "category": category["slug"]}
+        )
+    ]
+    if in_use:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Deze categorie wordt nog gebruikt door: {', '.join(sorted(in_use))}. "
+                "Zet die dranken eerst in een andere categorie."
+            ),
+        )
+
+    await db.categories.delete_one({"_id": item_id})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

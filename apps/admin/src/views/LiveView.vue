@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EChart from '../charts/EChart.vue'
-import { hourlyOption, type HourRow } from '../charts/options'
+import {
+  hourlyOption,
+  hourlyStackedOption,
+  type HourMetric,
+  type HourRow,
+  type HourStack,
+} from '../charts/options'
 import { formatEur, formatNumber } from '../charts/theme'
 import StatTile from '../components/StatTile.vue'
 import { useAuth } from '../stores/auth'
@@ -17,6 +23,19 @@ const products = ref<{ name: string; qty: number; coupons: number }[]>([])
 const bars = ref<{ name: string; qty: number; coupons: number }[]>([])
 const staff = ref<{ name: string; orders: number; qty: number; voided: number }[]>([])
 const hours = ref<HourRow[]>([])
+const stack = ref<HourStack>({ hours: [], series: [] })
+const metric = ref<HourMetric>('qty')
+const splitByDrink = ref(false)
+
+const METRICS: [HourMetric, string][] = [
+  ['qty', 'consumpties'],
+  ['revenue_eur', 'omzet'],
+  ['margin_eur', 'marge'],
+]
+
+/** Splitting by drink only makes sense for counts: a stacked euro figure per drink
+ *  needs a cost price that is often missing, and would silently drop those drinks. */
+const canSplit = computed(() => metric.value === 'qty')
 const updatedAt = ref('')
 const failed = ref(false)
 
@@ -40,6 +59,7 @@ async function refresh() {
       auth.client.stats('by-staff', { edition_id: id }),
       auth.client.stats('by-hour', { edition_id: id }),
     ])
+    stack.value = await auth.client.stats('by-hour-by-product', { edition_id: id })
     overview.value = o
     products.value = p
     bars.value = b
@@ -95,8 +115,30 @@ watch(() => editions.currentId, refresh)
     </div>
 
     <section class="card">
-      <h2>Verkoop per uur</h2>
-      <EChart :option="hourlyOption(hours)" :height="260" />
+      <div class="card-head">
+        <h2>Verkoop per uur</h2>
+        <div class="toggles">
+          <button
+            v-for="[key, label] in METRICS"
+            :key="key"
+            :class="{ on: metric === key }"
+            @click="metric = key"
+          >
+            {{ label }}
+          </button>
+          <label class="split">
+            <input v-model="splitByDrink" type="checkbox" :disabled="!canSplit" />
+            per drank
+          </label>
+        </div>
+      </div>
+      <EChart
+        :option="splitByDrink && canSplit ? hourlyStackedOption(stack) : hourlyOption(hours, metric)"
+        :height="280"
+      />
+      <p v-if="metric === 'margin_eur'" class="muted small">
+        Marge telt alleen dranken waarvan de inkoopprijs ingevuld is.
+      </p>
     </section>
 
     <div class="cols">
@@ -161,5 +203,44 @@ watch(() => editions.currentId, refresh)
 }
 .cols .card {
   margin-bottom: 0;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.card-head h2 {
+  margin: 0;
+}
+.toggles {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.toggles button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.toggles .on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.split {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+.small {
+  font-size: 13px;
+  margin-top: 8px;
 }
 </style>

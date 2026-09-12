@@ -7,11 +7,13 @@ to a number that informs a purchasing decision.
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-CONFIRMED = {"status": "confirmed"}
+# A sale that was not voided. Staff drinks are recorded but never charged, so
+# counting them here would report free drinks as revenue.
+SOLD = {"status": "confirmed", "kind": {"$ne": "staff"}}
 
 
 def _match(edition_id: str) -> dict:
-    return {"$match": {"edition_id": edition_id, **CONFIRMED}}
+    return {"$match": {"edition_id": edition_id, **SOLD}}
 
 
 async def _coupon_value(db: AsyncIOMotorDatabase, edition_id: str) -> float:
@@ -38,7 +40,9 @@ async def overview(db: AsyncIOMotorDatabase, edition_id: str) -> dict:
     ]
     rows = await db.orders.aggregate(pipeline).to_list(1)
     row = rows[0] if rows else {"orders": 0, "coupons": 0, "drinks": 0}
-    voided = await db.orders.count_documents({"edition_id": edition_id, "status": "voided"})
+    voided = await db.orders.count_documents(
+        {"edition_id": edition_id, "status": "voided", "kind": {"$ne": "staff"}}
+    )
 
     # Margin reuses by_product so the "unknown cost" rule lives in exactly one
     # place. Summing only the priced products keeps the figure honest, and
@@ -136,7 +140,7 @@ async def by_bar(db: AsyncIOMotorDatabase, edition_id: str) -> list[dict]:
 
 async def by_staff(db: AsyncIOMotorDatabase, edition_id: str) -> list[dict]:
     pipeline = [
-        {"$match": {"edition_id": edition_id}},
+        {"$match": {"edition_id": edition_id, "kind": {"$ne": "staff"}}},
         {
             "$group": {
                 "_id": "$staff_id",
@@ -180,12 +184,47 @@ async def by_hour(db: AsyncIOMotorDatabase, edition_id: str, tz: str) -> list[di
                 "_id": {"$hour": {"date": "$created_at", "timezone": tz}},
                 "qty": {"$sum": {"$sum": "$items.qty"}},
                 "coupons": {"$sum": "$total_coupons"},
+                "items": {"$push": "$items"},
             }
         },
         {"$sort": {"_id": 1}},
+        {
+            "$project": {
+                "qty": 1,
+                "coupons": 1,
+                "items": {
+                    "$reduce": {
+                        "input": "$items",
+                        "initialValue": [],
+                        "in": {"$concatArrays": ["$$value", "$$this"]},
+                    }
+                },
+            }
+        },
     ]
     rows = await db.orders.aggregate(pipeline).to_list(None)
-    hours = [{"hour_local": r["_id"], "qty": r["qty"], "coupons": r["coupons"]} for r in rows]
+    value = await _coupon_value(db, edition_id)
+    costs = {
+        p["slug"]: p.get("cost_price_eur")
+        async for p in db.products.find({"edition_id": edition_id})
+    }
+
+    hours = []
+    for r in rows:
+        # Margin is only meaningful for the drinks whose cost is known. An hour where
+        # nothing is priced reports null rather than drawing a zero line.
+        priced = [i for i in r["items"] if costs.get(i["slug"]) is not None]
+        cost = sum(i["qty"] * costs[i["slug"]] for i in priced) if priced else None
+        revenue = _round2(r["coupons"] * value)
+        hours.append(
+            {
+                "hour_local": r["_id"],
+                "qty": r["qty"],
+                "coupons": r["coupons"],
+                "revenue_eur": revenue,
+                "margin_eur": _round2(revenue - cost) if cost is not None else None,
+            }
+        )
     return _chronological(hours)
 
 
@@ -287,3 +326,110 @@ async def compare(db: AsyncIOMotorDatabase, edition_a: str, edition_b: str) -> l
             }
         )
     return out
+
+
+async def by_hour_by_product(
+    db: AsyncIOMotorDatabase, edition_id: str, tz: str, top: int = 7
+) -> dict:
+    """Per-hour quantities split by drink, for the stacked chart.
+
+    The validated palette has eight categorical slots on the adjacent pairlist that
+    stacked bars use, so the busiest `top` drinks are named and the rest fold into
+    one "Overig" series. A ninth generated hue is never an option.
+    """
+    ranked = await by_product(db, edition_id)
+    named = {r["slug"]: r["name"] for r in ranked[:top]}
+
+    pipeline = [
+        _match(edition_id),
+        {"$unwind": "$items"},
+        {
+            "$group": {
+                "_id": {
+                    "hour": {"$hour": {"date": "$created_at", "timezone": tz}},
+                    "slug": "$items.slug",
+                },
+                "qty": {"$sum": "$items.qty"},
+            }
+        },
+    ]
+    rows = await db.orders.aggregate(pipeline).to_list(None)
+
+    hours = sorted({r["_id"]["hour"] for r in rows})
+    series: dict[str, dict[int, int]] = {name: dict.fromkeys(hours, 0) for name in named.values()}
+    if len(ranked) > top:
+        series["Overig"] = dict.fromkeys(hours, 0)
+
+    for r in rows:
+        label = named.get(r["_id"]["slug"], "Overig")
+        if label in series:
+            series[label][r["_id"]["hour"]] += r["qty"]
+
+    ordered = [h["hour_local"] for h in _chronological([{"hour_local": h} for h in hours])]
+    return {
+        "hours": ordered,
+        "series": [
+            {"name": name, "data": [by_h[h] for h in ordered]} for name, by_h in series.items()
+        ],
+    }
+
+
+async def staff_consumption(db: AsyncIOMotorDatabase, edition_id: str) -> dict:
+    """What staff drank. Recorded but never charged, so it lives outside every
+    revenue figure and is reported on its own terms."""
+    value = await _coupon_value(db, edition_id)
+    match = {"$match": {"edition_id": edition_id, "status": "confirmed", "kind": "staff"}}
+
+    per_product = await db.orders.aggregate(
+        [
+            match,
+            {"$unwind": "$items"},
+            {
+                "$group": {
+                    "_id": "$items.slug",
+                    "name": {"$first": "$items.name"},
+                    "qty": {"$sum": "$items.qty"},
+                    "coupons": {"$sum": {"$multiply": ["$items.qty", "$items.unit_price_coupons"]}},
+                }
+            },
+            {"$sort": {"qty": -1}},
+        ]
+    ).to_list(None)
+
+    per_staff = await db.orders.aggregate(
+        [
+            match,
+            {
+                "$group": {
+                    "_id": "$staff_id",
+                    "drinks": {"$sum": {"$sum": "$items.qty"}},
+                    "coupons": {"$sum": "$total_coupons"},
+                }
+            },
+            {"$sort": {"drinks": -1}},
+        ]
+    ).to_list(None)
+
+    names = {s["_id"]: s["name"] async for s in db.staff.find({"edition_id": edition_id})}
+    total_coupons = sum(r["coupons"] for r in per_product)
+
+    return {
+        "drinks": sum(r["qty"] for r in per_product),
+        "coupons": total_coupons,
+        # What those drinks would have been worth if they had been sold.
+        "value_eur": _round2(total_coupons * value),
+        "per_product": [
+            {"slug": r["_id"], "name": r["name"], "qty": r["qty"], "coupons": r["coupons"]}
+            for r in per_product
+        ],
+        "per_staff": [
+            {
+                "staff_id": r["_id"],
+                "name": names.get(r["_id"], "?"),
+                "drinks": r["drinks"],
+                "coupons": r["coupons"],
+                "value_eur": _round2(r["coupons"] * value),
+            }
+            for r in per_staff
+        ],
+    }

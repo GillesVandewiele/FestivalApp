@@ -15,6 +15,7 @@ function order(id: string): OrderPayload {
     items: [{ product_id: 'p1', slug: 'jupiler', name: 'Jupiler', qty: 1, unit_price_coupons: 1 }],
     created_at: '2026-07-01T20:00:00+00:00',
     status: 'confirmed',
+    kind: 'sale',
   }
 }
 

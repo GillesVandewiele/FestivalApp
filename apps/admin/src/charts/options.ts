@@ -4,6 +4,22 @@ import { activeTheme, baseOption } from './theme'
 export interface HourRow {
   hour_local: number
   qty: number
+  coupons: number
+  revenue_eur: number | null
+  margin_eur: number | null
+}
+
+export type HourMetric = 'qty' | 'revenue_eur' | 'margin_eur'
+
+export interface HourStack {
+  hours: number[]
+  series: { name: string; data: number[] }[]
+}
+
+const METRIC_AXIS: Record<HourMetric, string> = {
+  qty: 'consumpties',
+  revenue_eur: 'omzet (€)',
+  margin_eur: 'marge (€)',
 }
 export interface ProductRow {
   slug: string
@@ -22,7 +38,7 @@ export interface CompareRow {
 }
 
 /** Single series: the question is "when is the peak", and position answers it. */
-export function hourlyOption(rows: HourRow[]): EChartsCoreOption {
+export function hourlyOption(rows: HourRow[], metric: HourMetric = 'qty'): EChartsCoreOption {
   const theme = activeTheme()
   const base = baseOption(theme)
   return {
@@ -34,16 +50,63 @@ export function hourlyOption(rows: HourRow[]): EChartsCoreOption {
       data: rows.map((r) => `${String(r.hour_local).padStart(2, '0')}u`),
       splitLine: { show: false },
     },
-    yAxis: { ...base.axisCommon, type: 'value', name: 'consumpties' },
+    yAxis: { ...base.axisCommon, type: 'value', name: METRIC_AXIS[metric] },
     series: [
       {
         type: 'bar',
-        name: 'Consumpties',
-        data: rows.map((r) => r.qty),
+        name: METRIC_AXIS[metric],
+        data: rows.map((r) => r[metric] ?? 0),
         itemStyle: { color: theme.color[0], borderRadius: [4, 4, 0, 0] },
         barMaxWidth: 44,
       },
     ],
+  }
+}
+
+/**
+ * The same hours split by drink.
+ *
+ * The validated palette has eight categorical slots on the adjacent pairlist that
+ * stacked bars use, so the backend hands over seven named drinks plus "Overig". A
+ * ninth generated hue is never an option, and the legend carries identity so colour
+ * is never the only encoding.
+ */
+export function hourlyStackedOption(stack: HourStack): EChartsCoreOption {
+  const theme = activeTheme()
+  const base = baseOption(theme)
+  const last = stack.series.length - 1
+
+  return {
+    ...base,
+    tooltip: { ...base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: {
+      data: stack.series.map((s) => s.name),
+      textStyle: { color: theme.inkDim },
+      top: 0,
+      type: 'scroll',
+    },
+    grid: { ...base.grid, top: 44 },
+    xAxis: {
+      ...base.axisCommon,
+      type: 'category',
+      data: stack.hours.map((h) => `${String(h).padStart(2, '0')}u`),
+      splitLine: { show: false },
+    },
+    yAxis: { ...base.axisCommon, type: 'value', name: 'consumpties' },
+    series: stack.series.map((s, i) => ({
+      type: 'bar',
+      stack: 'uur',
+      name: s.name,
+      data: s.data,
+      // A 2px gap between segments, and rounded ends only on the top of the stack.
+      itemStyle: {
+        color: theme.color[i % theme.color.length],
+        borderColor: theme.surface,
+        borderWidth: 1,
+        borderRadius: i === last ? [4, 4, 0, 0] : 0,
+      },
+      barMaxWidth: 44,
+    })),
   }
 }
 

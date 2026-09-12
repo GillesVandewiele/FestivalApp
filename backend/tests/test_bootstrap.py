@@ -81,3 +81,32 @@ async def test_bootstrap_returns_staff_and_server_time(client, festival):
 
 async def test_bootstrap_requires_a_device_token(client, festival):
     assert (await client.get("/api/v1/bootstrap")).status_code == 401
+
+
+async def test_bootstrap_returns_categories_in_order(client, db, festival):
+    """The POS groups its grid by these and takes their colour from here."""
+    from app.models.catalog import Category
+
+    await db.categories.insert_many(
+        [
+            Category(
+                edition_id=festival["edition"].id,
+                slug="fris",
+                name="Frisdrank",
+                colour="#5b9bd5",
+                sort_order=1,
+            ).to_mongo(),
+            Category(
+                edition_id=festival["edition"].id,
+                slug="bier",
+                name="Bier",
+                colour="#e8a33d",
+                sort_order=0,
+            ).to_mongo(),
+        ]
+    )
+
+    body = (await client.get("/api/v1/bootstrap", headers=_auth(festival))).json()
+
+    assert [c["name"] for c in body["categories"]] == ["Bier", "Frisdrank"]
+    assert body["categories"][0]["colour"] == "#e8a33d"

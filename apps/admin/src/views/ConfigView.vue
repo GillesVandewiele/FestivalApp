@@ -8,15 +8,32 @@ type Row = Record<string, unknown> & { id: string }
 const auth = useAuth()
 const editions = useEditions()
 
-const tab = ref<'editions' | 'bars' | 'products' | 'staff' | 'devices'>('products')
+const tab = ref<'editions' | 'bars' | 'categories' | 'products' | 'staff' | 'devices'>(
+  'products',
+)
 const rows = ref<Row[]>([])
 const barsForEdition = ref<Row[]>([])
+const categories = ref<Row[]>([])
 const draft = ref<Record<string, unknown>>({})
 const error = ref('')
 const newToken = ref<{ label: string; token: string } | null>(null)
 
+// A fixed set of swatches rather than a colour picker. A free picker produces
+// unreadable buttons on the dark POS screen; these are checked against it.
+const SWATCHES = [
+  '#e8a33d',
+  '#c0566f',
+  '#4fb3a5',
+  '#5b9bd5',
+  '#a9764a',
+  '#8f7fd8',
+  '#5fae5f',
+  '#d97757',
+]
+
 const TABS = [
   ['products', 'Dranken'],
+  ['categories', 'Categorieën'],
   ['bars', 'Verkooppunten'],
   ['staff', 'Medewerkers'],
   ['editions', 'Edities'],
@@ -30,6 +47,8 @@ function blankDraft() {
   if (tab.value === 'products')
     return { edition_id: eid, slug: '', name: '', category: 'bier', price_coupons: 1,
              cost_price_eur: null, purchase_unit: null, available_at: [] }
+  if (tab.value === 'categories')
+    return { edition_id: eid, slug: '', name: '', colour: SWATCHES[0], sort_order: 0 }
   if (tab.value === 'bars') return { edition_id: eid, name: '', sort_order: 0 }
   if (tab.value === 'staff') return { edition_id: eid, name: '' }
   if (tab.value === 'devices') return { edition_id: eid, bar_id: '', label: '' }
@@ -49,6 +68,7 @@ async function load() {
   }
   if (editionId.value) {
     barsForEdition.value = (await auth.client.list('bars', editionId.value)) as Row[]
+    categories.value = (await auth.client.list('categories', editionId.value)) as Row[]
   }
   draft.value = blankDraft()
 }
@@ -68,9 +88,10 @@ async function create() {
     }
     await load()
   } catch (e) {
+    const status = (e as { status?: number }).status
     error.value =
-      (e as { status?: number }).status === 409
-        ? 'Er bestaat al een product met deze slug in deze editie.'
+      status === 409
+        ? 'Die slug bestaat al in deze editie.'
         : 'Opslaan mislukt. Controleer de velden.'
   }
 }
@@ -89,10 +110,23 @@ async function rotate(row: Row) {
 }
 
 async function remove(row: Row) {
-  if (tab.value === 'devices') {
-    await auth.client.revokeDevice(row.id)
-  } else {
-    await auth.client.remove(tab.value, row.id)
+  error.value = ''
+  try {
+    if (tab.value === 'devices') {
+      await auth.client.revokeDevice(row.id)
+    } else {
+      await auth.client.remove(tab.value, row.id)
+    }
+  } catch (e) {
+    // Deleting a category that products still use is refused, and the server says
+    // which ones. Showing that verbatim is more useful than a generic failure.
+    const body = (e as { message?: string }).message ?? ''
+    try {
+      error.value = JSON.parse(body).detail
+    } catch {
+      error.value = 'Verwijderen mislukt.'
+    }
+    return
   }
   await load()
 }
@@ -150,12 +184,30 @@ watch([tab, editionId], load)
           <label>Slug<input v-model="draft.slug" placeholder="witte-wijn" /></label>
           <label>Categorie
             <select v-model="draft.category">
-              <option>bier</option><option>wijn</option><option>cocktail</option>
-              <option>fris</option><option>warm</option>
+              <option v-for="c in categories" :key="c.id" :value="c.slug">{{ c.name }}</option>
             </select>
           </label>
           <label>Bonnetjes<input v-model.number="draft.price_coupons" type="number" min="0" /></label>
           <label>Inkoopprijs €<input v-model.number="draft.cost_price_eur" type="number" step="0.01" /></label>
+        </template>
+        <template v-else-if="tab === 'categories'">
+          <label>Naam<input v-model="draft.name" placeholder="Bier" /></label>
+          <label>Slug<input v-model="draft.slug" placeholder="bier" /></label>
+          <label>Volgorde<input v-model.number="draft.sort_order" type="number" /></label>
+          <label>Kleur
+            <div class="swatches">
+              <button
+                v-for="s in SWATCHES"
+                :key="s"
+                type="button"
+                class="swatch"
+                :class="{ on: draft.colour === s }"
+                :style="{ background: s }"
+                :aria-label="s"
+                @click="draft.colour = s"
+              />
+            </div>
+          </label>
         </template>
         <template v-else-if="tab === 'devices'">
           <label>Label<input v-model="draft.label" placeholder="Tablet bar 1" /></label>
@@ -221,6 +273,28 @@ watch([tab, editionId], load)
         </tbody>
       </table>
 
+      <table v-else-if="tab === 'categories'">
+        <thead><tr><th>Naam</th><th>Slug</th><th>Volgorde</th><th>Kleur</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="r in rows" :key="r.id">
+            <td>{{ r.name }}</td>
+            <td class="muted">{{ r.slug }}</td>
+            <td>
+              <input class="mini" type="number" :value="r.sort_order"
+                     @change="patch(r, 'sort_order', Number(($event.target as HTMLInputElement).value))" />
+            </td>
+            <td>
+              <div class="swatches end">
+                <button v-for="s in SWATCHES" :key="s" type="button" class="swatch small"
+                        :class="{ on: r.colour === s }" :style="{ background: s }"
+                        :aria-label="s" @click="patch(r, 'colour', s)" />
+              </div>
+            </td>
+            <td><button @click="remove(r)">Verwijderen</button></td>
+          </tr>
+        </tbody>
+      </table>
+
       <table v-else>
         <thead>
           <tr>
@@ -259,6 +333,14 @@ watch([tab, editionId], load)
 .form { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-dim); }
 .mini { width: 84px; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatches.end { justify-content: flex-end; }
+.swatch {
+  width: 30px; height: 30px; min-height: 30px; padding: 0;
+  border: 2px solid transparent; border-radius: 8px; cursor: pointer;
+}
+.swatch.small { width: 22px; height: 22px; min-height: 22px; }
+.swatch.on { border-color: var(--ink); }
 .error { color: var(--bad); font-weight: 600; }
 .actions { display: flex; gap: 8px; justify-content: flex-end; }
 .token code {

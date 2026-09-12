@@ -24,6 +24,7 @@ export interface OrderPayload {
   items: OrderItemPayload[]
   created_at: string
   status: 'confirmed' | 'voided'
+  kind: 'sale' | 'staff'
   void?: { at: string; by: { type: 'staff'; id: string }; reason: string | null }
 }
 

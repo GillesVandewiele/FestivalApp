@@ -62,3 +62,18 @@ timezone would silently shift a whole evening's data into the wrong buckets.
 A product that ran out did not sell what people wanted; it sold what was in stock.
 Forecasts that ignore this under-buy the same product every year, compounding. Anything
 that computes purchasing advice must account for recorded stockouts, not just units sold.
+
+## 9. Staff drinks are recorded but never counted as revenue
+
+`Order.kind` is `"sale"` or `"staff"`. **Every aggregation filters on it.** A staff drink
+is stored with its items and its coupon value, so the report can say what those drinks
+would have been worth, but it is never charged and never appears in a revenue, margin, or
+purchasing figure.
+
+**Why:** a pipeline that forgets the filter reports free drinks as income at full coupon
+price. That is worse than not tracking staff drinks at all, because the number looks
+right. It also inflates next year's purchasing advice with demand that was never paid for.
+
+The POS toggle resets after every commit for the same reason: an accidentally sticky
+`personeel` mode would book a paying customer's round as free, and nothing downstream
+would flag it.

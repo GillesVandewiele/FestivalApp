@@ -31,6 +31,7 @@ async def upsert_order(db: AsyncIOMotorDatabase, order_in: OrderIn, device: Devi
         "total_coupons": total,  # recomputed, never trusted
         "created_at": order_in.created_at,
         "status": order_in.status,
+        "kind": order_in.kind,
         "void": order_in.void.model_dump() if order_in.void else None,
     }
 

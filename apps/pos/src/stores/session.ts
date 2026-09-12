@@ -14,9 +14,18 @@ export interface Product {
   sort_order: number
 }
 
+export interface Category {
+  id: string
+  slug: string
+  name: string
+  colour: string
+  sort_order: number
+}
+
 export interface Catalog {
   edition: { id: string; name: string }
   bar: { id: string; name: string }
+  categories: Category[]
   products: Product[]
   staff: { id: string; name: string }[]
 }

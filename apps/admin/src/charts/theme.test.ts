@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHART_THEME, formatEur, formatNumber, formatPct } from './theme'
+import { CHART_THEME, CHART_THEME_DARK, formatEur, formatNumber, formatPct } from './theme'
 
 describe('chart theme', () => {
   it('formats euros in Dutch convention', () => {
@@ -25,7 +25,13 @@ describe('chart theme', () => {
   })
 
   it('exposes a categorical palette of distinct colours', () => {
-    expect(CHART_THEME.color.length).toBeGreaterThanOrEqual(5)
     expect(new Set(CHART_THEME.color).size).toBe(CHART_THEME.color.length)
+  })
+
+  it('has enough slots for the widest chart, so no series repeats a colour', () => {
+    // The stacked hourly chart carries seven drinks plus "Overig". With only five
+    // slots the palette wrapped and two drinks shared a colour.
+    expect(CHART_THEME.color.length).toBeGreaterThanOrEqual(8)
+    expect(CHART_THEME_DARK.color.length).toBe(CHART_THEME.color.length)
   })
 })
