@@ -33,6 +33,7 @@ exists to produce. Full detail in [`.claude/rules/sales-data-invariants.md`](.cl
 - `device_id` and `total_coupons` are always recomputed server-side, never trusted from the payload.
 - Orders snapshot the name and coupon price they were sold at. Cost price is joined at report time.
 - Product `slug` is stable across editions. It is the year-over-year join key.
+- Staff drinks (`kind: "staff"`) are recorded but excluded from every revenue figure.
 
 ## Model selection per task
 

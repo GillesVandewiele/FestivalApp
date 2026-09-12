@@ -12,9 +12,9 @@ One plan per subsystem. Each leaves the repository with working software.
 | # | Plan | Delivers |
 |---|---|---|
 | 1 | [Foundation and backend](superpowers/plans/2026-09-12-foundation-and-backend.md) | Data model, auth, device enrolment, sync API, CI, deploy. **Code complete, awaiting hosting setup.** |
-| 2 | POS app (not yet written) | The tablet PWA, offline queue, sync |
-| 3 | Admin shell and live view (not yet written) | Login, catalog configuration, live dashboard |
-| 4 | Reports (not yet written) | Profit, quadrant, Pareto, procurement, year-over-year |
+| 2 | [POS app](superpowers/plans/2026-09-12-pos-app.md) | The tablet PWA, offline queue, sync |
+| 3 | [Admin app](superpowers/plans/2026-09-12-admin-app.md) | Aggregations, config UI, live dashboard, reports, procurement |
+| 4 | [Demo feedback](superpowers/plans/2026-09-12-demo-feedback.md) | Categories, staff drinks, typeable codes, hourly split |
 
 ## Harness
 
@@ -25,4 +25,6 @@ One plan per subsystem. Each leaves the repository with working software.
 
 ## Operations
 
-- [`DEPLOYMENT.md`](DEPLOYMENT.md) — Atlas and Render setup, environment variables, secret rotation.
+- [`DEPLOYMENT.md`](DEPLOYMENT.md) — Atlas, Render and Cloudflare Pages setup, environment
+  variables, secret rotation, troubleshooting.
+- [`TODO.md`](TODO.md) — everything only the organiser can do, before and after a festival.

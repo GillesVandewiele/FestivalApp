@@ -1,0 +1,3 @@
+# Single page app. The service worker handles this once installed; this covers the
+# very first load, before there is a service worker.
+/*    /index.html   200

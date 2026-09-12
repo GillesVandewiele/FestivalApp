@@ -4,72 +4,75 @@ Drink-sales registration and analysis for a festival. Bar staff record orders on
 in as few taps as possible; organisers get live figures during the event and purchasing
 advice afterwards.
 
-The point of the system is the dataset it leaves behind. Every edition's sales are kept,
-so next year's stock order can be based on what actually happened rather than on memory.
+The point of the system is the dataset it leaves behind. Every edition's sales are kept, so
+next year's stock order rests on what actually happened rather than on memory.
+
+```
+┌─ apps/pos    (Vue 3 PWA)  ──┐        ┌──────────────┐      ┌─────────────┐
+│  bar tablets, offline-first │───────▶│  FastAPI     │─────▶│ MongoDB     │
+└─────────────────────────────┘        │  (Render)    │      │ Atlas M0    │
+┌─ apps/admin  (Vue 3 SPA)  ──┐        │              │      │             │
+│  organiser: stats + config  │───────▶└──────────────┘      └─────────────┘
+└─────────────────────────────┘
+   both on Cloudflare Pages
+```
+
+Everything runs on free tiers.
 
 ## Status
 
 | Part | State |
 |---|---|
 | Backend API | Built and tested |
-| POS app (bar tablets) | Built and testable locally |
-| Admin app (organisers) | Built and testable locally |
+| POS app (bar tablets) | Built, runs locally, not yet used at a festival |
+| Admin app (organisers) | Built, runs locally |
+| Hosting | **Not set up yet.** See [`docs/TODO.md`](docs/TODO.md) |
 
-## Documentation
+---
 
-- [Design](docs/superpowers/specs/2026-09-12-festival-sales-app-design.md) covers the data
-  model, the API, and the reasoning behind each decision.
-- [Documentation index](docs/INDEX.md) lists the plans and harness notes.
-- [Deployment](docs/DEPLOYMENT.md) covers Atlas, Render, and secret rotation.
+## Running it locally
 
-## Running the whole thing locally
-
-Five commands. The first is a one-off.
+You need [`uv`](https://docs.astral.sh/uv/) and Node 22. No Docker, no sudo, no accounts:
+MongoDB is downloaded into a gitignored `.tools/` on first use.
 
 ```bash
-make install install-web    # dependencies (downloads MongoDB on first run)
+make install install-web    # dependencies (downloads MongoDB the first time)
 make mongo-start            # local database on port 27017
-make seed                   # a small demo festival; prints a device token per bar
-make dev                    # the API on :8000       (leave this running)
-make dev-pos                # the POS app on :5173   (second terminal)
-make dev-admin              # organiser app on :5174 (third terminal)
+make seed-demo              # three editions of demo sales; prints device codes
+make dev                    # API on :8000            ← leave running
+make dev-pos                # bar app on :5173        ← second terminal
+make dev-admin              # organiser app on :5174  ← third terminal
 ```
 
-Create an organiser login once, while the database is running:
+Then create an organiser login, once:
 
 ```bash
-cd backend && uv run python -m app.cli create-organiser you@example.com
+cd backend && uv run python -m app.cli create-organiser jij@voorbeeld.be
 ```
 
-Open http://localhost:5173, paste one of the tokens `make seed` printed, pick a name, and
-start tapping. `make mongo-stop` shuts the database down again.
+- **Bar app**: <http://localhost:5173>. Paste a code that `make seed-demo` printed, pick a
+  name, start tapping.
+- **Organiser app**: <http://localhost:5174>. Log in with the account you just made.
 
-For the organiser app, `make seed` gives you an empty festival. To see the reports with
-something in them, use `make seed-demo` instead: three editions of plausible sales, with
-growth, a product introduced mid-way, one falling out of favour, and a stockout, so the
-year-over-year comparison and the purchasing advice have real shapes to show. It is
-deterministic, so the numbers are the same every time.
+`make mongo-stop` shuts the database down. `make help` lists every target.
 
-### End-to-end tests
+### Two kinds of seed data
 
-The POS app has Playwright tests covering the tap sequence, the long-press decrement and
-undo. They need the stack running and a device token:
+| Command | What you get |
+|---|---|
+| `make seed` | One small festival. Good for trying the till |
+| `make seed-demo` | Three editions with growth, a drink introduced mid-way, one falling out of favour, and a stockout. Use this to look at the reports |
 
-```bash
-cd apps/pos && POS_DEVICE_TOKEN=<token from make seed> npm run e2e
-```
-
-They skip without the token, so they do not run in CI. Run them after touching the sell
-screen.
+`seed-demo` is deterministic: the same numbers every run.
 
 ### Testing on a real tablet
 
-`make dev-pos` prints a `Network:` address such as `http://192.168.1.20:5173`. Open that
-on a tablet on the same wifi. The API is proxied through the same address, so there is
-nothing else to configure.
+`make dev-pos` prints a `Network:` address such as `http://192.168.1.20:5173`. Open that on
+a tablet on the same wifi. The API is proxied through the same address, so there is nothing
+else to configure.
 
-Add it to the home screen for the real experience: it installs as a PWA with no browser
-chrome, which is how staff should run it.
+Add it to the home screen for the real thing: it installs as a PWA with no browser chrome,
+which is how staff should run it.
 
 ### Checking that offline actually works
 
@@ -78,33 +81,114 @@ chrome, which is how staff should run it.
 3. Start the API again. Within five seconds the queue drains, the badge returns to
    `opgeslagen`, and nothing is duplicated.
 
-## Backend development
+---
 
-Requires `uv`. Tests run against a real MongoDB, which is downloaded into a gitignored
-`.tools/` on first use. Docker and sudo are not needed.
+## Deploying it
+
+Follow [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) in order: Atlas, then Render, then two
+Cloudflare Pages projects, then fix `CORS_ORIGINS`, then create your organiser account.
+About half an hour, mostly waiting for builds.
+
+[`docs/TODO.md`](docs/TODO.md) is the checklist of everything only you can do, including
+what to configure before a festival and what to do on the day.
+
+### After the free tiers are set up
+
+Once Atlas, Render and Pages are live, the day-to-day looks like this.
+
+**Configuring a new edition.** Everything happens in the organiser app under
+**Instellingen**, in this order, because each step depends on the one before:
+
+1. **Edities** — name, year, and *the value of one bonnetje in euros*. Every euro figure in
+   the app derives from that number.
+2. **Categorieën** — the rows on the tablet screen, in the order you want them. Colour comes
+   from a fixed set of eight, chosen to stay distinguishable on a dark screen at night.
+3. **Verkooppunten** — the bars.
+4. **Dranken** — name, slug, category, price in bonnetjes, and, when the invoices arrive,
+   the purchase price per single item plus how you buy it (a `bak` of 24, a `doos` of 6).
+   Tick which bars sell it.
+5. **Medewerkers** — the names staff pick from at the start of a shift.
+6. **Tablets** — issue a code per tablet, like `K9GG-BBVY-MF0T`, and type it into the bar
+   app. Codes are shown exactly once; **Nieuwe code** replaces a lost one and kills the old.
+
+**Deploying a change.** Push to `main`. Render and both Pages projects rebuild
+automatically. CI runs first; if it is red, nothing is deployed that you have to undo.
+
+**During a festival.** Point a free cron at `/api/v1/health` every 10 minutes to keep the
+backend awake, and **turn it off afterwards**: a permanently awake service burns 730 of the
+750 free instance-hours a month. Details in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#keeping-the-backend-awake-on-festival-days).
+
+**After a festival.** Enter the supplier invoices under **Instellingen → Dranken**. Every
+historical margin report becomes correct at once, because cost is joined when a report runs
+rather than frozen into each sale. Then read **Rapporten → Inkoopadvies**.
+
+---
+
+## What the apps do
+
+### Bar app
+
+A five-drink round is six taps: three on Jupiler, two on Water, one on the total. No
+dialogs, no menus, no second screen.
+
+| Action | Gesture |
+|---|---|
+| Add a drink | Tap the product |
+| Remove one | Hold the product, or tap its chip in the strip |
+| Commit | Tap the total bar. Clears instantly for the next customer |
+| Undo | Tap `↶ ongedaan`. No confirmation |
+| Empty the order | `leegmaken` |
+| Staff drink (free) | `personeel` in the header, then commit as usual |
+| Change staff member | Tap the name in the header |
+
+It keeps selling through a total network outage. Orders are written to the tablet before
+the screen clears and sync when signal returns; because the tablet generates each order's
+id, a retry can never duplicate a sale.
+
+### Organiser app
+
+**Live** — consumpties, bonnetjes, omzet, marge, per drink, per bar, per staff member, and
+sales per hour with a toggle between counts, revenue and margin, optionally split by drink.
+Refreshes every 15 seconds.
+
+**Rapporten** — profit per product, margin against volume, which drinks carry the volume,
+hourly demand, busiest hour per bar, what staff drank, year-over-year comparison, and a
+purchasing plan that ends in a shopping list with a total. Everything exports to CSV.
+
+**Instellingen** — editions, categories, bars, drinks, staff, tablets.
+
+---
+
+## Development
 
 ```bash
-make install    # install dependencies
-make test       # run the test suite
-make dev        # run the API with auto-reload
-make check      # everything CI runs
-make help       # all targets
+make check      # what CI runs: lint, format check, backend tests
+make test       # backend tests only
+make test-web   # frontend tests
+make lint       # fix what ruff can fix
 ```
 
-Interactive API docs at http://127.0.0.1:8000/docs once `make dev` is running.
+End-to-end tests for the till need the stack running and a device code:
 
-To point at a database, copy `backend/.env.example` to `backend/.env` and fill it in.
-That file is gitignored.
+```bash
+cd apps/pos && POS_DEVICE_TOKEN=<code from make seed> npm run e2e
+```
 
-## Architecture
+They skip without the code, so they do not run in CI. Run them after touching the sell
+screen.
 
-Two Vue front-ends over one FastAPI backend and one MongoDB database. The POS app is an
-offline-first PWA: it keeps selling through a total network outage and syncs when signal
-returns. That works because each tablet generates its own order IDs, which makes syncing
-idempotent, so a retry over a flaky link can never duplicate a sale.
+Conventions live in [`CLAUDE.md`](CLAUDE.md) and [`.claude/rules/`](.claude/rules/). The
+ones worth knowing before changing anything:
 
-Everything runs on free tiers: Cloudflare Pages for the front-ends, Render for the API,
-MongoDB Atlas M0 for the database.
+- [`sales-data-invariants`](.claude/rules/sales-data-invariants.md) — nine properties that
+  keep the dataset trustworthy. Breaking one produces plausible wrong numbers rather than
+  an error.
+- [`public-repo-secrets`](.claude/rules/public-repo-secrets.md) — this repository is public.
+- [`no-failing-tests`](.claude/rules/no-failing-tests.md) — read the exit code, not a grep
+  of the output.
+
+Design and plans are under [`docs/INDEX.md`](docs/INDEX.md).
 
 ## Security
 
@@ -119,4 +203,6 @@ uv tool install pre-commit
 pre-commit install
 ```
 
-See [`.claude/rules/public-repo-secrets.md`](.claude/rules/public-repo-secrets.md).
+Device codes are twelve characters so they can be typed. That is sixty bits, which is only
+safe because failed codes are rate limited per address; see
+[`app/throttle.py`](backend/app/throttle.py).

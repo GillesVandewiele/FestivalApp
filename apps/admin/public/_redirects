@@ -1,0 +1,2 @@
+# Client-side routing: a refresh on /reports must reach index.html, not a 404.
+/*    /index.html   200
