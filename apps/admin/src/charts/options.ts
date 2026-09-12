@@ -86,6 +86,10 @@ export function marginVolumeOption(rows: ProductRow[]): EChartsCoreOption {
           color: theme.inkDim,
           fontSize: 12,
         },
+        // Selective direct labels: with a dozen products the names collide into an
+        // unreadable pile. Drop the ones that would overlap and let the tooltip
+        // cover them, rather than labelling every point.
+        labelLayout: { hideOverlap: true },
       },
     ],
   }

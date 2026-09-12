@@ -14,9 +14,14 @@ describe('chart theme', () => {
     expect(formatNumber(undefined)).toBe('—')
   })
 
+  it('always uses one decimal so a column of percentages lines up', () => {
+    expect(formatPct(88)).toBe('+88,0%')
+    expect(formatPct(73.24)).toBe('+73,2%')
+  })
+
   it('formats percentages with an explicit sign', () => {
     expect(formatPct(12.5)).toBe('+12,5%')
-    expect(formatPct(-8)).toBe('−8%')
+    expect(formatPct(-8)).toBe('−8,0%')
   })
 
   it('exposes a categorical palette of distinct colours', () => {

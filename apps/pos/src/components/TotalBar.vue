@@ -18,15 +18,21 @@ function commit() {
 
 <template>
   <div class="bar">
+    <!--
+      Always rendered, disabled when there is nothing to undo. Showing it only after
+      the first sale made it undiscoverable, and made the bar jump when it appeared.
+    -->
     <button
-      v-if="canUndo"
       data-test="undo"
       class="undo"
+      :disabled="!canUndo"
       aria-label="Laatste bestelling ongedaan maken"
       @click="emit('undo')"
     >
-      &#8630;
+      <span class="glyph">&#8630;</span>
+      <span class="word">ongedaan</span>
     </button>
+
     <button
       data-test="commit"
       class="commit"
@@ -35,7 +41,8 @@ function commit() {
       @click="commit"
     >
       <span class="tnum">{{ total }}</span>
-      {{ total === 1 ? 'bonnetje' : 'bonnetjes' }}
+      <span class="unit">{{ total === 1 ? 'bonnetje' : 'bonnetjes' }}</span>
+      <span v-if="total > 0" class="tick">&check;</span>
     </button>
   </div>
 </template>
@@ -45,42 +52,80 @@ function commit() {
   display: flex;
   gap: var(--gap);
   padding: var(--gap);
+  border-top: 1px solid var(--line);
 }
 .undo {
-  width: 84px;
-  min-height: 88px;
-  border: 2px solid var(--undo);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 104px;
+  min-height: 74px;
+  border: 1px solid var(--undo);
   border-radius: var(--radius);
   background: transparent;
   color: var(--undo);
   font: inherit;
-  font-size: 30px;
+  cursor: pointer;
 }
-.undo:active {
-  background: color-mix(in srgb, var(--undo) 18%, transparent);
+.undo .glyph {
+  font-size: 24px;
+  line-height: 1;
+}
+.undo .word {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.undo:disabled {
+  border-color: var(--line);
+  color: var(--text-dim);
+  opacity: 0.5;
+  cursor: default;
+}
+.undo:active:not(:disabled) {
+  background: color-mix(in srgb, var(--undo) 16%, transparent);
 }
 .commit {
+  position: relative;
   flex: 1;
-  min-height: 88px;
+  min-height: 74px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
   border: none;
   border-radius: var(--radius);
   background: var(--commit);
   color: var(--commit-ink);
   font: inherit;
-  font-size: 40px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  cursor: pointer;
 }
 .commit .tnum {
-  font-size: 56px;
-  margin-right: 10px;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.commit .unit {
+  font-size: 22px;
+  font-weight: 600;
+}
+.commit .tick {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 28px;
+  font-weight: 700;
 }
 .commit.idle {
   background: var(--surface);
   color: var(--text-dim);
+  cursor: default;
 }
 .commit:active:not(.idle) {
-  filter: brightness(0.9);
+  filter: brightness(0.92);
 }
 .commit:focus-visible,
 .undo:focus-visible {

@@ -80,3 +80,22 @@ async def test_observed_growth_is_used_when_a_previous_edition_is_given(db, fest
     }
     assert rows["jupiler"]["growth_pct"] == 50.0
     assert rows["jupiler"]["advised"] == 9
+
+
+async def test_the_rounding_surplus_is_reported(db, festival):
+    """Whole packs only, so you always buy more than advised. That overshoot is
+    stock you are stuck with, because a partial bak cannot go back."""
+    rows = {r["slug"]: r for r in await procurement.advise(db, festival["e26"].id)}
+
+    jupiler = rows["jupiler"]
+    assert jupiler["advised"] == 7
+    assert jupiler["units_to_order"] == 1
+    assert jupiler["total_units"] == 24  # 1 bak of 24
+    assert jupiler["surplus_units"] == 17  # 24 - 7
+
+
+async def test_surplus_is_unknown_without_a_purchase_unit(db, festival):
+    rows = {r["slug"]: r for r in await procurement.advise(db, festival["e26"].id)}
+
+    assert rows["water"]["total_units"] is None
+    assert rows["water"]["surplus_units"] is None

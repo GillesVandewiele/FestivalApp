@@ -113,9 +113,10 @@ function switchStaff() {
       :qty-of="cart.qtyOf"
       :sold-out="soldOut"
       @add="cart.add"
+      @remove="(p) => cart.remove(p.id)"
     />
 
-    <OrderStrip :lines="cart.lines" @remove="cart.remove" />
+    <OrderStrip :lines="cart.lines" @remove="cart.remove" @clear="cart.clear" />
 
     <TotalBar
       :total="cart.totalCoupons"

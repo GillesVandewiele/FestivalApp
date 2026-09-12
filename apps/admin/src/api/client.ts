@@ -49,6 +49,8 @@ export function createClient(baseUrl = '', fetchImpl: typeof fetch = globalThis.
     enrollDevice: (body: { edition_id: string; bar_id: string; label: string }) =>
       request('/api/v1/admin/devices/enroll', { method: 'POST', body: JSON.stringify(body) }),
     listDevices: () => request('/api/v1/admin/devices'),
+    rotateDevice: (id: string) =>
+      request(`/api/v1/admin/devices/${id}/rotate`, { method: 'POST' }),
     revokeDevice: (id: string) =>
       request(`/api/v1/admin/devices/${id}/revoke`, { method: 'POST' }),
 

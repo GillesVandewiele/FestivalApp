@@ -29,7 +29,7 @@ Five commands. The first is a one-off.
 ```bash
 make install install-web    # dependencies (downloads MongoDB on first run)
 make mongo-start            # local database on port 27017
-make seed                   # demo festival; prints a device token per bar
+make seed                   # a small demo festival; prints a device token per bar
 make dev                    # the API on :8000       (leave this running)
 make dev-pos                # the POS app on :5173   (second terminal)
 make dev-admin              # organiser app on :5174 (third terminal)
@@ -43,6 +43,24 @@ cd backend && uv run python -m app.cli create-organiser you@example.com
 
 Open http://localhost:5173, paste one of the tokens `make seed` printed, pick a name, and
 start tapping. `make mongo-stop` shuts the database down again.
+
+For the organiser app, `make seed` gives you an empty festival. To see the reports with
+something in them, use `make seed-demo` instead: three editions of plausible sales, with
+growth, a product introduced mid-way, one falling out of favour, and a stockout, so the
+year-over-year comparison and the purchasing advice have real shapes to show. It is
+deterministic, so the numbers are the same every time.
+
+### End-to-end tests
+
+The POS app has Playwright tests covering the tap sequence, the long-press decrement and
+undo. They need the stack running and a device token:
+
+```bash
+cd apps/pos && POS_DEVICE_TOKEN=<token from make seed> npm run e2e
+```
+
+They skip without the token, so they do not run in CI. Run them after touching the sell
+screen.
 
 ### Testing on a real tablet
 

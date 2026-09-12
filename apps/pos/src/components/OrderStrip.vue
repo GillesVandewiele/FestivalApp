@@ -2,21 +2,26 @@
 import type { CartLine } from '../stores/cart'
 
 defineProps<{ lines: CartLine[] }>()
-defineEmits<{ remove: [string] }>()
+defineEmits<{ remove: [string]; clear: [] }>()
 </script>
 
 <template>
   <!--
-    Two jobs: let staff glance-check the round before taking coupons, and give
-    "remove one" a real home. A tablet has no right-click and long-press is
-    slow and unreliable, so decrementing has to be a plain tap somewhere.
+    Glance-check the round before taking coupons, and a plain tap to remove one.
+    Long-pressing a product does the same, but this makes it visible.
   -->
   <div v-if="lines.length" class="strip">
-    <button v-for="l in lines" :key="l.product.id" class="chip" @click="$emit('remove', l.product.id)">
+    <button
+      v-for="l in lines"
+      :key="l.product.id"
+      class="chip"
+      @click="$emit('remove', l.product.id)"
+    >
       <span class="n tnum">{{ l.qty }}&times;</span>
       {{ l.product.name }}
       <span class="minus">&minus;</span>
     </button>
+    <button class="chip clear" @click="$emit('clear')">leegmaken</button>
   </div>
 </template>
 
@@ -25,22 +30,23 @@ defineEmits<{ remove: [string] }>()
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 8px var(--gap) 0;
+  padding: 0 var(--gap) 8px;
 }
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 46px;
+  min-height: 42px;
   flex: 0 0 auto;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: transparent;
+  background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 16px;
+  font-size: 15px;
   white-space: nowrap;
+  cursor: pointer;
 }
 .chip:active {
   background: var(--surface-press);
@@ -50,7 +56,11 @@ defineEmits<{ remove: [string] }>()
 }
 .minus {
   color: var(--text-dim);
-  font-size: 19px;
+  font-size: 18px;
   line-height: 1;
+}
+.clear {
+  color: var(--text-dim);
+  margin-left: auto;
 }
 </style>

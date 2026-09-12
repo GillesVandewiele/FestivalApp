@@ -17,6 +17,29 @@ async def test_overview_excludes_voided_orders(db, festival):
     assert result["voided_orders"] == 1
 
 
+async def test_overview_reports_margin_and_what_it_leaves_out(db, festival):
+    """Water has no cost price, so it contributes revenue but no margin. The
+    figure must say so rather than quietly counting water as pure profit."""
+    result = await stats.overview(db, festival["e26"].id)
+
+    # jupiler 15.00 - 3.60 = 11.40, cava 37.50 - 12.00 = 25.50
+    assert result["margin_eur"] == 36.9
+    assert result["cost_eur"] == 15.6
+    assert result["cost_missing"] == 1
+
+
+async def test_overview_margin_is_unknown_when_no_product_has_a_cost(db, festival):
+    await db.products.update_many(
+        {"edition_id": festival["e26"].id}, {"$set": {"cost_price_eur": None}}
+    )
+
+    result = await stats.overview(db, festival["e26"].id)
+
+    assert result["margin_eur"] is None
+    assert result["cost_eur"] is None
+    assert result["cost_missing"] == 3
+
+
 async def test_by_product_computes_margin(db, festival):
     rows = {r["slug"]: r for r in await stats.by_product(db, festival["e26"].id)}
 

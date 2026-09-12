@@ -52,6 +52,11 @@ async def advise(
         unit_size = unit["size"] if unit else None
         units = math.ceil(advised / unit_size) if unit_size else None
 
+        # Whole packs only, so you always end up with more than the advice. That
+        # overshoot is real stock you carry: you cannot return a partial bak.
+        total_units = units * unit_size if units is not None else None
+        surplus = total_units - advised if total_units is not None else None
+
         cost_price = product.get("cost_price_eur")
         cost = (
             round(units * unit_size * cost_price, 2)
@@ -70,6 +75,8 @@ async def advise(
                 "purchase_unit": unit["name"] if unit else None,
                 "unit_size": unit_size,
                 "units_to_order": units,
+                "total_units": total_units,
+                "surplus_units": surplus,
                 "cost_eur": cost,
                 "cost_known": cost is not None,
                 "had_stockout": had_stockout,

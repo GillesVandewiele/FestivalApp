@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
+from pymongo import ReturnDocument
 
 from ..config import Settings
 from ..deps import get_current_user, get_db, get_settings_from_app
@@ -68,6 +69,34 @@ async def list_devices(db: AsyncIOMotorDatabase = Depends(get_db)) -> list[Devic
         )
         async for d in db.devices.find({})
     ]
+
+
+@router.post("/{device_id}/rotate", status_code=status.HTTP_201_CREATED)
+async def rotate(
+    device_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    settings: Settings = Depends(get_settings_from_app),
+) -> EnrollResponse:
+    """Issue a fresh coupling code for a device that is already enrolled.
+
+    The old code stops working immediately, which is the point: it is what you
+    reach for when a code has been shared too widely or a tablet was handed on.
+    The device keeps its identity, so its past sales stay attributed to it.
+    """
+    token = generate_device_token()
+    doc = await db.devices.find_one_and_update(
+        {"_id": device_id},
+        {
+            "$set": {
+                "token_hash": hash_device_token(token, settings.device_token_pepper),
+                "revoked_at": None,  # rotating also un-revokes: a new code means back in service
+            }
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="device not found")
+    return EnrollResponse(id=doc["_id"], label=doc["label"], token=token)
 
 
 @router.post("/{device_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)

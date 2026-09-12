@@ -54,6 +54,9 @@ export function activeTheme(): ChartTheme {
 
 const EUR = new Intl.NumberFormat('nl-BE', { style: 'currency', currency: 'EUR' })
 const NUM = new Intl.NumberFormat('nl-BE')
+// One decimal always, so a column of percentages lines up instead of mixing
+// "+88%" with "+73,2%".
+const PCT = new Intl.NumberFormat('nl-BE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 /** An unknown value renders as a dash. Never as 0,00, which reads as free. */
 export function formatEur(value: number | null | undefined): string {
@@ -69,7 +72,7 @@ export function formatNumber(value: number | null | undefined): string {
 export function formatPct(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—'
   const sign = value < 0 ? '−' : '+'
-  return `${sign}${NUM.format(Math.abs(Math.round(value * 10) / 10))}%`
+  return `${sign}${PCT.format(Math.abs(value))}%`
 }
 
 /** Shared axis and grid styling so no chart invents its own chrome. */

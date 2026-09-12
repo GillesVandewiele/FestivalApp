@@ -7,7 +7,7 @@ defineProps<{
   qtyOf: (id: string) => number
   soldOut: Set<string>
 }>()
-defineEmits<{ add: [Product] }>()
+defineEmits<{ add: [Product]; remove: [Product] }>()
 </script>
 
 <template>
@@ -19,16 +19,22 @@ defineEmits<{ add: [Product] }>()
       :qty="qtyOf(p.id)"
       :sold-out="soldOut.has(p.id)"
       @add="$emit('add', p)"
+      @remove="$emit('remove', p)"
     />
   </div>
 </template>
 
 <style scoped>
+/*
+  Fixed row height. Previously the rows were 1fr of a flex-grown container, so ten
+  products in a single row became 950px-tall columns on a desktop screen.
+*/
 .grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  grid-auto-rows: minmax(var(--tap), 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-auto-rows: clamp(100px, 16vh, 140px);
+  align-content: start;
   gap: var(--gap);
   padding: var(--gap);
   overflow-y: auto;
