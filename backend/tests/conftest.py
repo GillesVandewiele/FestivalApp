@@ -147,3 +147,14 @@ async def anon_client(app):
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="https://testserver.local") as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def reset_device_throttle():
+    """Failed-code counters are process-global, so they leak between tests exactly
+    the way the rate limiter's counters did."""
+    from app import throttle
+
+    throttle.reset()
+    yield
+    throttle.reset()

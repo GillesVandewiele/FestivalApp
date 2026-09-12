@@ -2,19 +2,18 @@
 import { computed, ref } from 'vue'
 import type { Product } from '../stores/session'
 
-const props = defineProps<{ product: Product; qty: number; soldOut: boolean }>()
+const props = defineProps<{
+  product: Product
+  colour: string
+  qty: number
+  soldOut: boolean
+}>()
 const emit = defineEmits<{ add: []; remove: [] }>()
 
-const CATEGORY_COLOURS: Record<string, string> = {
-  bier: 'var(--cat-bier)',
-  wijn: 'var(--cat-wijn)',
-  cocktail: 'var(--cat-cocktail)',
-  fris: 'var(--cat-fris)',
-  warm: 'var(--cat-warm)',
-}
-
 const LONG_PRESS_MS = 450
-const tint = computed(() => CATEGORY_COLOURS[props.product.category] ?? 'var(--cat-default)')
+// The colour comes from the category in the database, because categories are
+// created in the admin app and have no entry in this stylesheet to look up.
+const tint = computed(() => props.colour)
 const priceLabel = computed(() =>
   props.product.price_coupons === 1 ? '1 bon' : `${props.product.price_coupons} bonnen`,
 )

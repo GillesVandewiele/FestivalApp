@@ -5,6 +5,10 @@
  * scripts/validate_palette.js in both modes on the adjacent pairlist:
  * worst CVD dE 9.1 light / 8.4 dark, worst normal-vision dE 19.6 light / 19.3 dark.
  *
+ * All eight slots are present because the stacked hourly chart uses them all. It
+ * previously carried only five, so a stack of eight series wrapped and Jupiler and
+ * Westmalle came out the same blue.
+ *
  * Deliberately NOT the POS app's category colours. Those work as 6px borders on
  * large tinted buttons, but as small chart marks the teal and blue sit at dE 11.5
  * for normal vision, under the 15 floor, and teal and brown fall below the chroma
@@ -13,8 +17,26 @@
  * Three light-mode slots fall below 3:1 against the surface, so the relief rule
  * applies: every chart ships a legend and a table view of the same numbers.
  */
-export const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'] as const
-export const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'] as const
+export const SERIES_LIGHT = [
+  '#2a78d6',
+  '#eb6834',
+  '#1baf7a',
+  '#eda100',
+  '#e87ba4',
+  '#008300',
+  '#4a3aa7',
+  '#e34948',
+] as const
+export const SERIES_DARK = [
+  '#3987e5',
+  '#d95926',
+  '#199e70',
+  '#c98500',
+  '#d55181',
+  '#008300',
+  '#9085e9',
+  '#e66767',
+] as const
 
 export interface ChartTheme {
   color: string[]

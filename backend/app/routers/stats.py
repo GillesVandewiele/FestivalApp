@@ -47,6 +47,18 @@ async def by_hour(edition_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -
     return await stats.by_hour(db, edition_id, tz)
 
 
+@router.get("/stats/by-hour-by-product")
+async def by_hour_by_product(edition_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> dict:
+    tz = await _timezone_of(db, edition_id)
+    return await stats.by_hour_by_product(db, edition_id, tz)
+
+
+@router.get("/stats/staff-consumption")
+async def staff_consumption(edition_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> dict:
+    await _timezone_of(db, edition_id)
+    return await stats.staff_consumption(db, edition_id)
+
+
 @router.get("/stats/peak-per-bar")
 async def peak_per_bar(edition_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> list[dict]:
     tz = await _timezone_of(db, edition_id)

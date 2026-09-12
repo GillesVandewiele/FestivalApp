@@ -17,6 +17,17 @@ class Edition(MongoModel):
     is_active: bool = True
 
 
+class Category(MongoModel):
+    """A drink category. Owns its colour, because a user-created category has no
+    entry in the POS stylesheet to look one up in."""
+
+    edition_id: str
+    slug: str = Field(pattern=SLUG_PATTERN)
+    name: str
+    colour: str = Field(pattern=r"^#[0-9a-f]{6}$")
+    sort_order: int = 0
+
+
 class Bar(MongoModel):
     edition_id: str
     name: str

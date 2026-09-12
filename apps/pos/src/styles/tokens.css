@@ -16,6 +16,7 @@
   --commit-ink: #17130f;
   --undo: #e5484d;
   --queued: #f5a524;
+  --staff: #7fb3ff; /* personeel: distinct from every drink category */
 
   /* Category colours come from the drinks themselves. Staff aim at a colour
      region before they read a word. */

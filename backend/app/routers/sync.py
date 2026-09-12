@@ -54,10 +54,17 @@ async def bootstrap(
         _serialise(d)
         async for d in db.staff.find({"edition_id": device.edition_id, "active": True})
     ]
+    # Categories carry their own colour and order, because the POS groups the grid by
+    # them and a user-created category has no entry in the stylesheet.
+    categories = [
+        _serialise(d)
+        async for d in db.categories.find({"edition_id": device.edition_id}).sort("sort_order")
+    ]
 
     return {
         "edition": _serialise(edition),
         "bar": _serialise(bar),
+        "categories": categories,
         "products": products,
         "staff": staff,
         "server_time": utcnow().isoformat(),

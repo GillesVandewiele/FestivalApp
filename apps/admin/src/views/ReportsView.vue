@@ -39,6 +39,13 @@ const hours = ref<HourRow[]>([])
 const peaks = ref<{ name: string; peak_hour: number; peak_qty: number }[]>([])
 const comparison = ref<CompareRow[]>([])
 const advice = ref<AdviceRow[]>([])
+const staffUse = ref<{
+  drinks: number
+  coupons: number
+  value_eur: number
+  per_product: { slug: string; name: string; qty: number; coupons: number }[]
+  per_staff: { staff_id: string; name: string; drinks: number; value_eur: number }[]
+} | null>(null)
 
 const compareTo = ref<string | null>(null)
 const growthPct = ref<number | null>(null)
@@ -67,6 +74,7 @@ async function load() {
   products.value = p
   hours.value = h
   peaks.value = k
+  staffUse.value = await auth.client.stats('staff-consumption', { edition_id: id })
   await Promise.all([loadCompare(), loadAdvice()])
 }
 
@@ -226,6 +234,39 @@ watch(compareTo, async () => {
       </p>
     </section>
 
+    <section v-if="staffUse && staffUse.drinks > 0" class="card">
+      <h2>Wat het personeel dronk</h2>
+      <p class="muted small">
+        Deze consumpties zijn gratis en tellen nergens mee als omzet. Ze staan hier apart, zodat
+        je weet wat ze gekost hebben.
+      </p>
+      <div class="staff-totals">
+        <span><strong>{{ formatNumber(staffUse.drinks) }}</strong> consumpties</span>
+        <span><strong>{{ formatNumber(staffUse.coupons) }}</strong> bonnetjes</span>
+        <span>waarde <strong>{{ formatEur(staffUse.value_eur) }}</strong></span>
+      </div>
+      <div class="cols">
+        <table>
+          <thead><tr><th>Drank</th><th>Aantal</th></tr></thead>
+          <tbody>
+            <tr v-for="r in staffUse.per_product" :key="r.slug">
+              <td>{{ r.name }}</td><td>{{ formatNumber(r.qty) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <table>
+          <thead><tr><th>Medewerker</th><th>Aantal</th><th>Waarde</th></tr></thead>
+          <tbody>
+            <tr v-for="r in staffUse.per_staff" :key="r.staff_id">
+              <td>{{ r.name }}</td>
+              <td>{{ formatNumber(r.drinks) }}</td>
+              <td>{{ formatEur(r.value_eur) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="card">
       <div class="card-head">
         <h2>Inkoopadvies voor volgend jaar</h2>
@@ -350,6 +391,16 @@ watch(compareTo, async () => {
 .sub {
   font-size: 12px;
   margin-left: 6px;
+}
+.staff-totals {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 12px 0 4px;
+}
+.staff-totals strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
 }
 tfoot td {
   border-bottom: none;

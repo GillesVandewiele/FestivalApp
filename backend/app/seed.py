@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from .config import get_settings
 from .db import ensure_indexes, get_client
-from .models.catalog import Bar, Edition, Product, PurchaseUnit, Staff
+from .models.catalog import Bar, Category, Edition, Product, PurchaseUnit, Staff
 from .models.identity import Device
 from .security import generate_device_token, hash_device_token
 
@@ -28,6 +28,14 @@ DRINKS = [
     ("koffie", "Koffie", "warm", 1, 0.22, ("doos", 100)),
 ]
 
+CATEGORIES = [
+    ("bier", "Bier", "#e8a33d"),
+    ("wijn", "Wijn", "#c0566f"),
+    ("cocktail", "Cocktail", "#4fb3a5"),
+    ("fris", "Frisdrank", "#5b9bd5"),
+    ("warm", "Warme dranken", "#a9764a"),
+]
+
 STAFF = ["Lotte", "Jonas", "Emma", "Wout", "Marie", "Sofie"]
 
 
@@ -37,7 +45,16 @@ async def seed() -> None:
     db = client[settings.mongo_db]
     await ensure_indexes(db)
 
-    for name in ("editions", "bars", "products", "staff", "orders", "stockouts", "devices"):
+    for name in (
+        "editions",
+        "bars",
+        "categories",
+        "products",
+        "staff",
+        "orders",
+        "stockouts",
+        "devices",
+    ):
         await db[name].delete_many({})
 
     now = datetime.now(UTC)
@@ -55,6 +72,14 @@ async def seed() -> None:
         Bar(edition_id=edition.id, name="Cocktailbar", sort_order=1),
     ]
     await db.bars.insert_many([b.to_mongo() for b in bars])
+    await db.categories.insert_many(
+        [
+            Category(
+                edition_id=edition.id, slug=slug, name=name, colour=colour, sort_order=i
+            ).to_mongo()
+            for i, (slug, name, colour) in enumerate(CATEGORIES)
+        ]
+    )
 
     products = []
     for i, (slug, name, category, coupons, cost, (unit, size)) in enumerate(DRINKS):

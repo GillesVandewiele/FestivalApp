@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from .common import MongoModel
 
 OrderStatus = Literal["confirmed", "voided"]
+# A staff drink is recorded but never charged, and never counted as revenue.
+OrderKind = Literal["sale", "staff"]
 
 
 class OrderItem(BaseModel):
@@ -39,6 +41,7 @@ class OrderIn(BaseModel):
     items: list[OrderItem]
     created_at: datetime
     status: OrderStatus = "confirmed"
+    kind: OrderKind = "sale"
     void: VoidInfo | None = None
 
 
@@ -52,6 +55,7 @@ class Order(MongoModel):
     created_at: datetime
     received_at: datetime
     status: OrderStatus = "confirmed"
+    kind: OrderKind = "sale"
     void: VoidInfo | None = None
 
 

@@ -19,6 +19,14 @@ const soldOut = ref(new Set<string>())
 const lastOrderId = ref<string | null>(null)
 const enrolError = ref('')
 
+/**
+ * Staff drinks are free but still counted. Deliberately a quiet toggle in the header
+ * rather than a button by the drinks: it is used a few times a night, not every round.
+ * It resets after every commit so it cannot be left on by accident, which would book
+ * a paying customer's round as free.
+ */
+const staffMode = ref(false)
+
 const staffName = computed(
   () => session.catalog?.staff.find((s) => s.id === session.staffId)?.name ?? '',
 )
@@ -69,11 +77,13 @@ async function commit() {
     barId: catalog.bar.id,
     staffId: session.staffId,
     at: session.now(),
+    kind: staffMode.value ? 'staff' : 'sale',
   })
 
   await enqueue(order) // durable before the screen clears
   lastOrderId.value = order.id
   cart.clear()
+  staffMode.value = false // never sticky
   await queue.refreshCount()
   void queue.drain() // fire and forget: the UI never waits on the network
 }
@@ -104,12 +114,21 @@ function switchStaff() {
   <div v-else-if="session.catalog" class="app">
     <header>
       <span class="bar-name">{{ session.catalog.bar.name }}</span>
+      <button
+        class="mode"
+        :class="{ on: staffMode }"
+        :aria-pressed="staffMode"
+        @click="staffMode = !staffMode"
+      >
+        personeel
+      </button>
       <button class="staff" @click="switchStaff">{{ staffName }}</button>
       <SyncBadge :online="queue.online" :pending="queue.pendingCount" />
     </header>
 
     <ProductGrid
       :products="session.catalog.products"
+      :categories="session.catalog.categories ?? []"
       :qty-of="cart.qtyOf"
       :sold-out="soldOut"
       @add="cart.add"
@@ -120,6 +139,7 @@ function switchStaff() {
 
     <TotalBar
       :total="cart.totalCoupons"
+      :staff-mode="staffMode"
       :can-undo="lastOrderId !== null"
       @commit="commit"
       @undo="undo"
@@ -146,8 +166,25 @@ header {
   font-weight: 800;
   font-size: 18px;
 }
-.staff {
+.mode {
   margin-left: auto;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.mode.on {
+  border-color: var(--staff);
+  background: color-mix(in srgb, var(--staff) 20%, transparent);
+  color: var(--staff);
+  font-weight: 700;
+}
+.staff {
   min-height: 42px;
   padding: 0 18px;
   border: 1px solid var(--line);

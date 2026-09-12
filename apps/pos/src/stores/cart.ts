@@ -13,6 +13,7 @@ export interface OrderContext {
   barId: string
   staffId: string
   at: Date
+  kind?: 'sale' | 'staff'
 }
 
 export const useCart = defineStore('cart', () => {
@@ -64,6 +65,7 @@ export const useCart = defineStore('cart', () => {
       })),
       created_at: ctx.at.toISOString(),
       status: 'confirmed',
+      kind: ctx.kind ?? 'sale',
     }
   }
 
