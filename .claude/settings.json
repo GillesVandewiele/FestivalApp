@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(jq:*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(git rev-parse*)",
+      "Bash(uv sync*)",
+      "Bash(uv run*)",
+      "Bash(uv add*)",
+      "Bash(uv remove*)",
+      "Bash(uv lock*)",
+      "Bash(python3:*)",
+      "Bash(make:*)",
+      "Bash(npm run*)",
+      "Bash(npm test*)",
+      "Bash(npm ci*)",
+      "Bash(gh pr:*)",
+      "Bash(gh run:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/session-start.sh" }
+        ]
+      }
+    ]
+  }
+}

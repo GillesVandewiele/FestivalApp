@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlist.paths]]
+description = "Placeholder values only, never real secrets"
+regex = '''.*\.env\.example$'''
+
+[[allowlist.paths]]
+description = "Rules and docs quote secret NAMES, never values"
+regex = '''^(\.claude/rules/|docs/).*\.md$'''
