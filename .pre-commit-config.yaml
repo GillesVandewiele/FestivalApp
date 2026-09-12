@@ -1,0 +1,29 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Ruff runs through uv so the version matches uv.lock (single source of truth).
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: bash -c 'cd backend && uv run ruff check "$@"' --
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false
+        require_serial: true
+      - id: ruff-format
+        name: ruff format --check
+        entry: bash -c 'cd backend && uv run ruff format --check "$@"' --
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false
+        require_serial: true
+      - id: uv-lock-check
+        name: uv lock --check
+        entry: bash -c 'cd backend && uv lock --check'
+        language: system
+        pass_filenames: false
+        files: (pyproject\.toml|uv\.lock)$

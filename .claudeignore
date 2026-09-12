@@ -1,0 +1,24 @@
+# Local test tooling (a full MongoDB distribution)
+.tools/
+
+# Node
+node_modules/
+apps/*/dist/
+packages/*/dist/
+.vite/
+
+# Python
+**/__pycache__/
+**/*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Lock files: large, low signal
+backend/uv.lock
+package-lock.json
+
+# Test output
+playwright-report/
+test-results/
+htmlcov/
