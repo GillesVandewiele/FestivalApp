@@ -2,6 +2,7 @@
 
 **Date:** 2026-09-12
 **Status:** Approved for planning
+**Repository:** https://github.com/GillesVandewiele/FestivalApp (public)
 
 ## 1. Purpose
 
@@ -339,7 +340,7 @@ merely undocumented.
 
 | Concern | Measure |
 |---|---|
-| Secrets in git | `.env` gitignored; `.env.example` holds placeholders only; `gitleaks` pre-commit hook; GitHub push protection and secret scanning enabled |
+| Secrets in git | `.env` gitignored; `.env.example` holds placeholders only; `gitleaks` pre-commit hook. GitHub secret scanning, **push protection**, Dependabot alerts and Dependabot security updates are enabled on the repository (done 2026-09-12). Generic (non-provider) secret patterns could not be enabled via the API — `gitleaks` covers that gap locally |
 | Database credentials | Dedicated Atlas user, `readWrite` on one database only, long generated password |
 | Atlas network access | Render's free tier has no fixed egress IP, so `0.0.0.0/0` is required. Stated plainly; credential scope above is the compensating control |
 | Tablet authentication | Long random device token, stored server-side as HMAC-SHA256 with a server pepper. A database dump yields no working tokens. Revocable per device |
