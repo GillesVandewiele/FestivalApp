@@ -33,3 +33,30 @@ secrets:  ## Scan the working tree for committed secrets
 .PHONY: mongo
 mongo:  ## Print the path to the local mongod binary, downloading it if needed
 	@./scripts/dev-mongo.sh
+
+.PHONY: install-web
+install-web:  ## Install frontend dependencies
+	npm install
+
+.PHONY: seed
+seed:  ## Load demo data and print device tokens for the POS app
+	cd backend && uv run python -m app.seed
+
+.PHONY: dev-pos
+dev-pos:  ## Run the POS app (reachable from a tablet on your wifi)
+	npm run dev:pos
+
+.PHONY: test-web
+test-web:  ## Run frontend tests
+	npm run test --workspace apps/pos
+
+.PHONY: mongo-start
+mongo-start:  ## Start a local MongoDB on port 27017 in the background
+	@MONGOD=$$(./scripts/dev-mongo.sh) ; \
+	mkdir -p .tools/data ; \
+	$$MONGOD --dbpath .tools/data --port 27017 --bind_ip 127.0.0.1 --fork \
+	         --logpath .tools/mongod.log && echo "MongoDB running on 127.0.0.1:27017"
+
+.PHONY: mongo-stop
+mongo-stop:  ## Stop the local MongoDB
+	@MONGOD=$$(./scripts/dev-mongo.sh) ; $$MONGOD --dbpath .tools/data --shutdown || true

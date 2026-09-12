@@ -1,0 +1,10 @@
+{
+  "name": "festivalapp",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:pos": "npm run dev --workspace apps/pos",
+    "build:pos": "npm run build --workspace apps/pos",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

@@ -12,7 +12,7 @@ so next year's stock order can be based on what actually happened rather than on
 | Part | State |
 |---|---|
 | Backend API | Built and tested |
-| POS app (bar tablets) | Not started, plan 2 |
+| POS app (bar tablets) | Built and testable locally |
 | Admin app (organisers) | Not started, plans 3 and 4 |
 
 ## Documentation
@@ -21,6 +21,37 @@ so next year's stock order can be based on what actually happened rather than on
   model, the API, and the reasoning behind each decision.
 - [Documentation index](docs/INDEX.md) lists the plans and harness notes.
 - [Deployment](docs/DEPLOYMENT.md) covers Atlas, Render, and secret rotation.
+
+## Running the whole thing locally
+
+Five commands. The first is a one-off.
+
+```bash
+make install install-web    # dependencies (downloads MongoDB on first run)
+make mongo-start            # local database on port 27017
+make seed                   # demo festival; prints a device token per bar
+make dev                    # the API on :8000       (leave this running)
+make dev-pos                # the POS app on :5173   (second terminal)
+```
+
+Open http://localhost:5173, paste one of the tokens `make seed` printed, pick a name, and
+start tapping. `make mongo-stop` shuts the database down again.
+
+### Testing on a real tablet
+
+`make dev-pos` prints a `Network:` address such as `http://192.168.1.20:5173`. Open that
+on a tablet on the same wifi. The API is proxied through the same address, so there is
+nothing else to configure.
+
+Add it to the home screen for the real experience: it installs as a PWA with no browser
+chrome, which is how staff should run it.
+
+### Checking that offline actually works
+
+1. Sell something with the API running. The badge reads `opgeslagen`.
+2. Stop the API with Ctrl-C. Keep selling. The badge counts up: `2 wachtend`.
+3. Start the API again. Within five seconds the queue drains, the badge returns to
+   `opgeslagen`, and nothing is duplicated.
 
 ## Backend development
 

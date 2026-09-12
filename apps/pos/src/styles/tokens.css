@@ -1,0 +1,65 @@
+:root {
+  /* Warm near-black. These tablets live outdoors at night: a bright screen
+     blinds the operator, drains battery, and glares. Dark is functional here. */
+  --bg: #17130f;
+  --surface: #221c16;
+  --surface-press: #2e261e;
+  --line: #3a3029;
+  --text: #f7f1e8;
+  --text-dim: #a39485;
+
+  /* The commit slab is warm white, not a coloured accent. It is read by two
+     people at once, one of them standing a metre back. Nothing beats white
+     on dark for that. It also keeps saturation free for the grid, where
+     colour actually carries information. */
+  --commit: #f7f1e8;
+  --commit-ink: #17130f;
+  --undo: #e5484d;
+  --queued: #f5a524;
+
+  /* Category colours come from the drinks themselves. Staff aim at a colour
+     region before they read a word. */
+  --cat-bier: #e8a33d;
+  --cat-wijn: #c0566f;
+  --cat-cocktail: #4fb3a5;
+  --cat-fris: #5b9bd5;
+  --cat-warm: #a9764a;
+  --cat-default: #8b8178;
+
+  --tap: 72px;
+  --radius: 12px;
+  --gap: 10px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    600 17px/1.2 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  overscroll-behavior: none; /* no pull-to-refresh mid-service */
+  user-select: none;
+  touch-action: manipulation; /* no double-tap zoom */
+}
+
+/* Numbers must not jitter as counts change. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
